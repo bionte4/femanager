@@ -326,32 +326,56 @@ export async function updateTicketStatusAction(
           const { runAntiFraudCheck } = await import("@/lib/antifraud");
           const fraud = await runAntiFraudCheck(ticket.id);
 
+          const engPay = ticket.assigned_engineer_id
+            ? await prisma.user.findUnique({
+                where: { id: ticket.assigned_engineer_id },
+                select: { engagement_type: true },
+              })
+            : null;
+          const isMitraPay = engPay?.engagement_type === "MITRA";
+
           if (fraud.hold_commission) {
-            await prisma.ticket.update({
-              where: { id: ticket.id },
-              data: { status: TicketStatus.PENDING_REVIEW },
-            });
+            if (isMitraPay) {
+              // Mitra: tahan komisi wallet via PENDING_REVIEW
+              await prisma.ticket.update({
+                where: { id: ticket.id },
+                data: { status: TicketStatus.PENDING_REVIEW },
+              });
+              await prisma.ticketLog.create({
+                data: {
+                  ticket_id: ticket.id,
+                  status_from: TicketStatus.RESOLVED,
+                  status_to: TicketStatus.PENDING_REVIEW,
+                  notes: `Anti-fraud hold: flags=${fraud.flags.join(",") || "-"} score=${fraud.score}. Komisi ditahan.`,
+                  photo_url: [],
+                },
+              });
+              console.warn(
+                `[antifraud] Ticket ${ticket.ticket_no} → PENDING_REVIEW (hold commission)`
+              );
+              return;
+            }
+
+            // PKWT: flag di ticket log saja (bukan hold wallet / PENDING_REVIEW)
             await prisma.ticketLog.create({
               data: {
                 ticket_id: ticket.id,
-                status_from: TicketStatus.RESOLVED,
-                status_to: TicketStatus.PENDING_REVIEW,
-                notes: `Anti-fraud hold: flags=${fraud.flags.join(",") || "-"} score=${fraud.score}. Komisi ditahan.`,
+                status_from: parsed.status,
+                status_to: parsed.status,
+                notes: `Anti-fraud flag (PKWT/HR): flags=${fraud.flags.join(",") || "-"} score=${fraud.score}. Tidak ada hold komisi wallet.`,
                 photo_url: [],
               },
             });
-            console.warn(
-              `[antifraud] Ticket ${ticket.ticket_no} → PENDING_REVIEW (hold commission)`
-            );
-            return;
           }
 
           const { processCommissionForTicket } = await import("@/lib/commission");
           await processCommissionForTicket(ticket.id);
 
-          const { recalculateLeaderboard } = await import("@/lib/leaderboard");
-          void recalculateLeaderboard("month");
-          void recalculateLeaderboard("all_time");
+          if (isMitraPay) {
+            const { recalculateLeaderboard } = await import("@/lib/leaderboard");
+            void recalculateLeaderboard("month");
+            void recalculateLeaderboard("all_time");
+          }
         } catch (e) {
           console.error("[resolve antifraud/commission]", e);
         }

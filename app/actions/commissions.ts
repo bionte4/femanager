@@ -120,6 +120,19 @@ export async function createAdjustment(input: {
     }
 
     await prisma.$transaction(async (tx) => {
+      const engineer = await tx.user.findUnique({
+        where: { id: input.engineer_id },
+        select: { engagement_type: true, role: true },
+      });
+      if (!engineer || engineer.role !== "FIELD_ENGINEER") {
+        throw new Error("Engineer tidak ditemukan");
+      }
+      if (engineer.engagement_type !== "MITRA") {
+        throw new Error(
+          "Adjustment wallet hanya untuk Mitra. PKWT memakai payroll HR."
+        );
+      }
+
       let wallet = await tx.engineerWallet.findUnique({
         where: { engineer_id: input.engineer_id },
       });

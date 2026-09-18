@@ -67,7 +67,14 @@ export async function getPayrollWallets() {
   const monthStart = startOfMonth();
 
   const engineers = await prisma.user.findMany({
-    where: { role: Role.FIELD_ENGINEER },
+    where: {
+      role: Role.FIELD_ENGINEER,
+      OR: [
+        { engagement_type: "MITRA" },
+        // Sisa saldo masa Mitra setelah switch ke PKWT — tetap tampil untuk settlement
+        { wallet: { is: { balance: { gt: 0 } } } },
+      ],
+    },
     include: {
       wallet: true,
       assigned_tickets: {
@@ -92,6 +99,7 @@ export async function getPayrollWallets() {
     full_name: e.full_name,
     phone: e.phone,
     city: e.city,
+    engagement_type: e.engagement_type,
     balance: e.wallet?.balance ?? 0,
     total_earned: e.wallet?.total_earned ?? 0,
     total_penalty: e.wallet?.total_penalty ?? 0,

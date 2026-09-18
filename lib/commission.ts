@@ -1,6 +1,5 @@
 import {
   DeviceType,
-  EngagementType,
   SlaTier,
   TicketStatus,
   TicketType,
@@ -12,6 +11,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { formatRupiah } from "@/lib/utils/rupiah";
 import { sendWhatsApp } from "@/lib/whatsapp";
+import { isMitraEngagement } from "@/lib/eligibility";
 
 export type CommissionBreakdown = {
   base_fee: number;
@@ -274,8 +274,15 @@ export async function processCommissionForTicket(ticketId: string): Promise<{
       return { success: false, error: "Tidak ada engineer assigned" };
     }
 
-    // PKWT / non-MITRA: isolasi wallet — tidak ada komisi ticket
-    if (ticket.assigned_engineer.engagement_type !== EngagementType.MITRA) {
+    // PKWT / non-MITRA: isolasi wallet — tandai calculated agar tidak di-retry
+    if (!isMitraEngagement(ticket.assigned_engineer.engagement_type)) {
+      await prisma.ticket.update({
+        where: { id: ticketId },
+        data: {
+          commission_calculated: true,
+          commission_amount: 0,
+        },
+      });
       return { success: true, skipped: true, total: 0 };
     }
 

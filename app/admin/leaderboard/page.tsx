@@ -41,7 +41,9 @@ export default async function AdminLeaderboardPage({ searchParams }: PageProps) 
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Leaderboard</h1>
         <p className="text-xs text-muted-foreground">
-          Ranking engineer berdasarkan SLA, kecepatan, trust, dan fraud.
+          Ranking <span className="font-medium">Mitra</span> (komisi) —
+          berdasarkan SLA, kecepatan, trust, dan fraud. PKWT tidak masuk board
+          ini.
           {category ? ` Filter: Top FE ${category}` : ""}
         </p>
       </div>

@@ -39,6 +39,7 @@ type WalletRow = {
   full_name: string;
   phone: string;
   city: string | null;
+  engagement_type?: string;
   balance: number;
   total_earned: number;
   total_penalty: number;
@@ -218,7 +219,17 @@ export function PayrollClient({
                       >
                         {w.full_name}
                       </Link>
-                      <p className="text-xs text-muted-foreground">{w.city}</p>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                        <p className="text-xs text-muted-foreground">{w.city}</p>
+                        {w.engagement_type && w.engagement_type !== "MITRA" && (
+                          <Badge variant="secondary" className="text-[10px]">
+                            {w.engagement_type === "PKWT_INTERNAL"
+                              ? "PKWT Internal"
+                              : "PKWT"}{" "}
+                            · sisa saldo
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="font-semibold text-emerald-700">
                       {formatRupiah(w.balance)}

@@ -67,7 +67,11 @@ export async function recalculateLeaderboard(
   const range = rangeForPeriod(period);
 
   const engineers = await prisma.user.findMany({
-    where: { role: Role.FIELD_ENGINEER },
+    where: {
+      role: Role.FIELD_ENGINEER,
+      // Board earnings/kompetisi mitra — PKWT tidak masuk
+      engagement_type: "MITRA",
+    },
     select: {
       id: true,
       full_name: true,
@@ -205,6 +209,7 @@ export async function getLeaderboard(
           is_suspended: true,
           phone: true,
           skills: true,
+          engagement_type: true,
         },
       },
     },
@@ -225,6 +230,7 @@ export async function getLeaderboard(
             is_suspended: true,
             phone: true,
             skills: true,
+            engagement_type: true,
           },
         },
       },
@@ -232,9 +238,14 @@ export async function getLeaderboard(
     });
   }
 
+  // Filter stale snapshot jika engineer sudah jadi PKWT
+  const mitraOnly = snapshots.filter(
+    (s) => s.engineer.engagement_type === "MITRA"
+  );
+
   const filtered = categoryCode
-    ? snapshots.filter((s) => s.engineer.skills.includes(categoryCode))
-    : snapshots;
+    ? mitraOnly.filter((s) => s.engineer.skills.includes(categoryCode))
+    : mitraOnly;
 
   return filtered.map((s, idx) => ({
     rank: categoryCode ? idx + 1 : s.rank,

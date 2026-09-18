@@ -42,16 +42,20 @@ export async function GET(req: NextRequest) {
                 city: true,
                 trust_score: true,
                 is_suspended: true,
+                engagement_type: true,
               },
             },
           },
           orderBy: { rank: "asc" },
         });
+        const mitra = snapshots.filter(
+          (s) => s.engineer.engagement_type === "MITRA"
+        );
         return NextResponse.json({
           success: true,
           period: raw,
-          data: snapshots.map((s) => ({
-            rank: s.rank,
+          data: mitra.map((s, idx) => ({
+            rank: idx + 1,
             engineer_id: s.engineer_id,
             full_name: s.engineer.full_name,
             city: s.engineer.city,

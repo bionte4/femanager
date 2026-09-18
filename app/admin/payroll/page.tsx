@@ -26,7 +26,9 @@ export default async function AdminPayrollPage() {
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Payroll</h1>
         <p className="text-xs text-muted-foreground">
-          Wallet engineer, transaksi komisi, dan approval penarikan.
+          Wallet komisi <span className="font-medium">Mitra</span>, transaksi,
+          dan approval penarikan. PKWT tidak masuk payroll wallet (kecuali sisa
+          saldo masa Mitra).
         </p>
       </div>
       <PayrollClient
