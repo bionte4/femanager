@@ -4,6 +4,16 @@ Platform Field Engineer Dispatch & SLA Management untuk monitoring EDC/LAN/WAN d
 
 Stack: **Next.js 14** (App Router) · **TypeScript** · **Tailwind** · **Prisma** · **PostgreSQL + PostGIS** · **NextAuth v5** · **Mapbox** · **PWA**
 
+## Dokumentasi
+
+| Dokumen | Isi |
+|---------|-----|
+| [docs/USER_GUIDE.md](./docs/USER_GUIDE.md) | Panduan pengguna (NOC / FE) |
+| [docs/MANUAL_GUIDE.md](./docs/MANUAL_GUIDE.md) | Manual teknis & operasi |
+| [docs/ERD.md](./docs/ERD.md) | ERD & model data |
+| [docs/BUSINESS_PLAN.md](./docs/BUSINESS_PLAN.md) | Business plan & roadmap |
+| [docs/README.md](./docs/README.md) | Indeks dokumentasi |
+
 ---
 
 ## Prerequisites

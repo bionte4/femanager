@@ -19,7 +19,7 @@ export default async function AdminLayout({
         userName={session.user.name ?? "Admin"}
         userRole={session.user.role}
       />
-      <div className="lg:pl-[220px]">
+      <div className="lg:pl-[232px]">
         <header className="sticky top-0 z-30 hidden h-12 items-center justify-end border-b border-border/60 bg-background/90 px-6 backdrop-blur lg:flex">
           <NotificationBell />
         </header>

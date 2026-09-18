@@ -20,6 +20,7 @@ import {
   BookOpen,
   Layers,
   Scale,
+  Inbox,
   GitBranch,
   Radio,
   LogOut,
@@ -87,7 +88,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Sistem",
     items: [
       { href: "/admin/integrations", label: "Integrations", icon: Plug },
-      { href: "/admin/integrations/dlq", label: "Webhook DLQ", icon: Plug },
+      { href: "/admin/integrations/dlq", label: "Webhook DLQ", icon: Inbox },
       { href: "/admin/settings", label: "Settings", icon: Settings },
     ],
   },
@@ -126,14 +127,14 @@ export function AdminSidebar({ userName, userRole }: AdminSidebarProps) {
   const roleLabel = userRole.replaceAll("_", " ");
 
   const nav = (
-    <nav className="flex-1 overflow-y-auto overscroll-contain px-2.5 py-2">
-      <div className="space-y-3">
+    <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2.5 py-2.5">
+      <div className="space-y-3.5">
         {NAV_GROUPS.map((group) => (
           <div key={group.label}>
-            <p className="mb-1 px-2.5 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
+            <p className="mb-1.5 px-2.5 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
               {group.label}
             </p>
-            <ul className="space-y-0.5">
+            <ul className="space-y-1">
               {group.items.map(({ href, label, icon: Icon }) => {
                 const active = isActivePath(pathname, href);
                 return (
@@ -142,10 +143,10 @@ export function AdminSidebar({ userName, userRole }: AdminSidebarProps) {
                       href={href}
                       onClick={() => setOpen(false)}
                       className={cn(
-                        "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium leading-none transition-colors",
+                        "flex min-h-8 items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] font-medium leading-snug transition-colors",
                         active
                           ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
-                          : "text-sidebar-foreground/65 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                          : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
                       )}
                     >
                       <Icon
@@ -157,7 +158,7 @@ export function AdminSidebar({ userName, userRole }: AdminSidebarProps) {
                         )}
                         strokeWidth={active ? 2.25 : 1.75}
                       />
-                      <span className="truncate">{label}</span>
+                      <span className="min-w-0 flex-1 truncate">{label}</span>
                     </Link>
                   </li>
                 );
@@ -204,40 +205,40 @@ export function AdminSidebar({ userName, userRole }: AdminSidebarProps) {
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-[220px] flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-transform duration-200 lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-50 flex h-dvh w-[232px] flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-transform duration-200 lg:translate-x-0",
           open ? "translate-x-0" : "-translate-x-full"
         )}
       >
         <div className="flex h-12 shrink-0 items-center gap-2 px-3.5">
-          <div className="flex h-7 w-7 items-center justify-center rounded bg-primary text-[10px] font-bold text-primary-foreground">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-primary text-[10px] font-bold text-primary-foreground">
             FE
           </div>
           <div className="min-w-0">
-            <p className="truncate text-[13px] font-semibold leading-none tracking-tight">
+            <p className="truncate text-[13px] font-semibold leading-snug tracking-tight">
               FE-Track
             </p>
-            <p className="mt-0.5 truncate text-[10px] text-sidebar-foreground/45">
+            <p className="truncate text-[10px] leading-snug text-sidebar-foreground/45">
               NOC Console
             </p>
           </div>
         </div>
 
-        <div className="mx-2.5 h-px bg-sidebar-border" />
+        <div className="mx-2.5 h-px shrink-0 bg-sidebar-border" />
 
         {nav}
 
-        <div className="shrink-0 border-t border-sidebar-border p-2.5">
+        <div className="shrink-0 border-t border-sidebar-border p-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))]">
           <div className="mb-2 flex items-center gap-2 px-0.5">
-            <Avatar className="h-7 w-7">
+            <Avatar className="h-7 w-7 shrink-0">
               <AvatarFallback className="bg-sidebar-accent text-[10px] text-sidebar-accent-foreground">
                 {initials}
               </AvatarFallback>
             </Avatar>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[12px] font-medium leading-tight">
+              <p className="truncate text-[12px] font-medium leading-snug">
                 {userName}
               </p>
-              <p className="truncate text-[10px] capitalize text-sidebar-foreground/45">
+              <p className="truncate text-[10px] capitalize leading-snug text-sidebar-foreground/45">
                 {roleLabel.toLowerCase()}
               </p>
             </div>
@@ -245,10 +246,10 @@ export function AdminSidebar({ userName, userRole }: AdminSidebarProps) {
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 w-full justify-start gap-2 px-2.5 text-[12px] text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            className="h-8 w-full justify-start gap-2 px-2.5 text-[12px] leading-snug text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
             onClick={() => signOut({ callbackUrl: "/login" })}
           >
-            <LogOut className="h-3.5 w-3.5" />
+            <LogOut className="h-3.5 w-3.5 shrink-0" />
             Keluar
           </Button>
         </div>
