@@ -745,6 +745,56 @@ export async function assignEngineerAction(
     if (!ticket) return { success: false, error: "Ticket tidak ditemukan" };
     if (!engineer) return { success: false, error: "Engineer tidak ditemukan" };
 
+    const {
+      eligibleForWork,
+      eligibilityMessage,
+      isPkwtEngagement,
+    } = await import("@/lib/eligibility");
+    const workElig = await eligibleForWork(engineer.id);
+    if (!workElig.ok) {
+      return {
+        success: false,
+        error: eligibilityMessage(workElig.reason),
+      };
+    }
+
+    // PKWT: manual assign wajib sama ketat dengan auto-dispatch (placement)
+    if (isPkwtEngagement(engineer.engagement_type)) {
+      const tenant = await prisma.tenant.findUnique({
+        where: { id: ticket.tenant_id },
+        select: { id: true, city: true, name: true },
+      });
+      if (!tenant) {
+        return { success: false, error: "Tenant ticket tidak ditemukan" };
+      }
+
+      const nowPlacement = new Date();
+      const activeContracts = await prisma.engineerContract.findMany({
+        where: {
+          user_id: engineer.id,
+          status: "ACTIVE",
+          start_at: { lte: nowPlacement },
+          end_at: { gte: nowPlacement },
+        },
+        select: {
+          placement_cities: true,
+          placement_tenant_ids: true,
+          client_label: true,
+        },
+      });
+      const { matchesPlacement } = await import("@/lib/contracts");
+      const inPlacement = activeContracts.some((c) =>
+        matchesPlacement(c, tenant)
+      );
+      if (!inPlacement) {
+        return {
+          success: false,
+          error:
+            "Engineer PKWT di luar placement kontrak (kota/tenant) untuk ticket ini",
+        };
+      }
+    }
+
     const { resolveTicketCategory, assertEngineerEligibleForTicket } =
       await import("@/lib/skill-match");
     const { categoryCode, requiresCertification } = await resolveTicketCategory({

@@ -2,7 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { type EngagementType, type EngineerContractType } from "@prisma/client";
+import {
+  type EngineerContractType,
+  type Prisma,
+} from "@prisma/client";
 import { auth, CONTRACT_ADMIN_ROLES } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
@@ -10,6 +13,8 @@ import {
   listExpiringContracts,
   parseCities,
 } from "@/lib/contracts";
+
+type DbClient = Prisma.TransactionClient | typeof prisma;
 
 type ActionResult<T = undefined> =
   | { success: true; data?: T }
@@ -68,8 +73,8 @@ function assertHttpsDocumentUrl(raw: string): string | null {
   }
 }
 
-async function assertNoPendingWithdrawal(userId: string) {
-  const pending = await prisma.withdrawal.findFirst({
+async function assertNoPendingWithdrawal(userId: string, db: DbClient = prisma) {
+  const pending = await db.withdrawal.findFirst({
     where: {
       engineer_id: userId,
       status: { in: ["PENDING", "APPROVED"] },
@@ -83,14 +88,17 @@ async function assertNoPendingWithdrawal(userId: string) {
   }
 }
 
-async function ensureEngagementForContract(params: {
-  userId: string;
-  contractType: EngineerContractType;
-  changedBy: string;
-  reason: string;
-}) {
+async function ensureEngagementForContract(
+  params: {
+    userId: string;
+    contractType: EngineerContractType;
+    changedBy: string;
+    reason: string;
+  },
+  db: DbClient = prisma
+) {
   const target = contractTypeToEngagement(params.contractType);
-  const user = await prisma.user.findUnique({
+  const user = await db.user.findUnique({
     where: { id: params.userId },
     select: { engagement_type: true },
   });
@@ -98,26 +106,24 @@ async function ensureEngagementForContract(params: {
   if (user.engagement_type === target) return;
 
   // Flip klasifikasi kerja = sensitif; blok jika ada cashout pending
-  await assertNoPendingWithdrawal(params.userId);
+  await assertNoPendingWithdrawal(params.userId, db);
 
-  await prisma.$transaction([
-    prisma.user.update({
-      where: { id: params.userId },
-      data: {
-        engagement_type: target,
-        employment_status: "ACTIVE",
-      },
-    }),
-    prisma.engagementChangeLog.create({
-      data: {
-        user_id: params.userId,
-        from_type: user.engagement_type,
-        to_type: target,
-        reason: params.reason,
-        changed_by: params.changedBy,
-      },
-    }),
-  ]);
+  await db.user.update({
+    where: { id: params.userId },
+    data: {
+      engagement_type: target,
+      employment_status: "ACTIVE",
+    },
+  });
+  await db.engagementChangeLog.create({
+    data: {
+      user_id: params.userId,
+      from_type: user.engagement_type,
+      to_type: target,
+      reason: params.reason,
+      changed_by: params.changedBy,
+    },
+  });
 }
 
 export async function listEngineerContracts(userId: string) {
@@ -163,40 +169,46 @@ export async function createEngineerContractAction(
     if (!engineer) return { success: false, error: "Engineer tidak ditemukan" };
 
     const activate = parsed.data.activate_now === true;
-    const status = activate
-      ? "ACTIVE"
-      : "DRAFT";
+    const status = activate ? "ACTIVE" : "DRAFT";
 
-    if (activate) {
-      await ensureEngagementForContract({
-        userId: engineer.id,
-        contractType: parsed.data.type,
-        changedBy: session.user.id,
-        reason: "Aktivasi kontrak baru",
+    // Atomic: flip engagement + create kontrak dalam 1 txn (hindari PKWT tanpa row)
+    const created = await prisma.$transaction(async (tx) => {
+      if (activate) {
+        await ensureEngagementForContract(
+          {
+            userId: engineer.id,
+            contractType: parsed.data.type,
+            changedBy: session.user.id,
+            reason: "Aktivasi kontrak baru",
+          },
+          tx
+        );
+      }
+
+      const row = await tx.engineerContract.create({
+        data: {
+          user_id: engineer.id,
+          type: parsed.data.type,
+          status,
+          start_at: startAt,
+          end_at: endAt,
+          client_label: parsed.data.client_label?.trim() || null,
+          placement_cities: parseCities(parsed.data.placement_cities),
+          document_url: docUrl,
+          notes: parsed.data.notes?.trim() || null,
+          created_by: session.user.id,
+        },
       });
-    }
 
-    const created = await prisma.engineerContract.create({
-      data: {
-        user_id: engineer.id,
-        type: parsed.data.type,
-        status,
-        start_at: startAt,
-        end_at: endAt,
-        client_label: parsed.data.client_label?.trim() || null,
-        placement_cities: parseCities(parsed.data.placement_cities),
-        document_url: docUrl,
-        notes: parsed.data.notes?.trim() || null,
-        created_by: session.user.id,
-      },
+      if (activate) {
+        await tx.user.update({
+          where: { id: engineer.id },
+          data: { employment_status: "ACTIVE" },
+        });
+      }
+
+      return row;
     });
-
-    if (activate) {
-      await prisma.user.update({
-        where: { id: engineer.id },
-        data: { employment_status: "ACTIVE" },
-      });
-    }
 
     revalidateContractPaths(engineer.id);
     return { success: true, data: { id: created.id } };
@@ -230,23 +242,26 @@ export async function activateContractAction(
       };
     }
 
-    await ensureEngagementForContract({
-      userId: contract.user_id,
-      contractType: contract.type,
-      changedBy: session.user.id,
-      reason: `Aktivasi kontrak ${contract.id}`,
-    });
+    await prisma.$transaction(async (tx) => {
+      await ensureEngagementForContract(
+        {
+          userId: contract.user_id,
+          contractType: contract.type,
+          changedBy: session.user.id,
+          reason: `Aktivasi kontrak ${contract.id}`,
+        },
+        tx
+      );
 
-    await prisma.$transaction([
-      prisma.engineerContract.update({
+      await tx.engineerContract.update({
         where: { id: contractId },
         data: { status: "ACTIVE" },
-      }),
-      prisma.user.update({
+      });
+      await tx.user.update({
         where: { id: contract.user_id },
         data: { employment_status: "ACTIVE" },
-      }),
-    ]);
+      });
+    });
 
     revalidateContractPaths(contract.user_id);
     return { success: true };
@@ -269,8 +284,8 @@ export async function suspendContractAction(
     });
     if (!contract) return { success: false, error: "Kontrak tidak ditemukan" };
 
-    await prisma.$transaction([
-      prisma.engineerContract.update({
+    await prisma.$transaction(async (tx) => {
+      await tx.engineerContract.update({
         where: { id: contractId },
         data: {
           status: "SUSPENDED",
@@ -278,12 +293,24 @@ export async function suspendContractAction(
             ? `${contract.notes ? contract.notes + "\n" : ""}[suspend] ${reason}`
             : contract.notes,
         },
-      }),
-      prisma.user.update({
-        where: { id: contract.user_id },
-        data: { employment_status: "SUSPENDED" },
-      }),
-    ]);
+      });
+
+      // Jangan suspend engineer jika masih ada kontrak ACTIVE lain
+      const stillActive = await tx.engineerContract.findFirst({
+        where: {
+          user_id: contract.user_id,
+          status: "ACTIVE",
+          end_at: { gte: new Date() },
+        },
+        select: { id: true },
+      });
+      if (!stillActive) {
+        await tx.user.update({
+          where: { id: contract.user_id },
+          data: { employment_status: "SUSPENDED" },
+        });
+      }
+    });
 
     revalidateContractPaths(contract.user_id);
     return { success: true };
@@ -339,7 +366,7 @@ export async function extendContractAction(input: {
   end_at: string;
 }): Promise<ActionResult> {
   try {
-    await requireContractAdmin();
+    const session = await requireContractAdmin();
     const endAt = new Date(input.end_at);
     if (Number.isNaN(endAt.getTime())) {
       return { success: false, error: "Tanggal tidak valid" };
@@ -359,25 +386,39 @@ export async function extendContractAction(input: {
     } = { end_at: endAt };
 
     // Extend dari EXPIRED/ENDED → kembali ACTIVE jika masih masa berlaku
-    if (
-      (contract.status === "EXPIRED" ||
-        contract.status === "ENDED") &&
-      endAt >= new Date()
-    ) {
+    const reactivate =
+      (contract.status === "EXPIRED" || contract.status === "ENDED") &&
+      endAt >= new Date();
+    if (reactivate) {
       data.status = "ACTIVE";
     }
 
-    await prisma.engineerContract.update({
-      where: { id: contract.id },
-      data,
-    });
+    await prisma.$transaction(async (tx) => {
+      // Sync engagement sebelum/bersamaan reaktivasi (hindari MITRA + kontrak PKWT aktif)
+      if (reactivate) {
+        await ensureEngagementForContract(
+          {
+            userId: contract.user_id,
+            contractType: contract.type,
+            changedBy: session.user.id,
+            reason: `Extend & reaktivasi kontrak ${contract.id}`,
+          },
+          tx
+        );
+      }
 
-    if (data.status === "ACTIVE") {
-      await prisma.user.update({
-        where: { id: contract.user_id },
-        data: { employment_status: "ACTIVE" },
+      await tx.engineerContract.update({
+        where: { id: contract.id },
+        data,
       });
-    }
+
+      if (reactivate) {
+        await tx.user.update({
+          where: { id: contract.user_id },
+          data: { employment_status: "ACTIVE" },
+        });
+      }
+    });
 
     revalidateContractPaths(contract.user_id);
     return { success: true };
