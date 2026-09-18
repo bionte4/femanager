@@ -47,6 +47,32 @@ export function isMitraEngagement(
   return type === "MITRA";
 }
 
+export function engagementLabel(type: EngagementType | string): string {
+  switch (type) {
+    case "PKWT_OUTTASK":
+      return "PKWT Outtask";
+    case "PKWT_INTERNAL":
+      return "PKWT Internal";
+    case "MITRA":
+    default:
+      return "Mitra";
+  }
+}
+
+export function employmentLabel(status: EmploymentStatus | string): string {
+  switch (status) {
+    case "ACTIVE":
+      return "Aktif";
+    case "SUSPENDED":
+      return "Ditangguhkan";
+    case "ENDED":
+      return "Berakhir";
+    case "NONE":
+    default:
+      return "—";
+  }
+}
+
 /** Pesan error untuk UI / server action */
 export function eligibilityMessage(reason?: EligibilityReason): string {
   switch (reason) {

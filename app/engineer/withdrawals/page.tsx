@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { Role } from "@prisma/client";
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { isPkwtEngagement } from "@/lib/eligibility";
 import { getMyWithdrawals } from "@/app/actions/wallet";
 import { formatRupiah } from "@/lib/utils/rupiah";
 import { Badge } from "@/components/ui/badge";
@@ -11,8 +12,16 @@ import { EmptyState } from "@/components/ui/empty-state";
 
 export default async function EngineerWithdrawalsPage() {
   const session = await auth();
-  if (!session?.user || session.user.role !== Role.FIELD_ENGINEER) {
+  if (!session?.user || session.user.role !== "FIELD_ENGINEER") {
     redirect("/login");
+  }
+
+  const me = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { engagement_type: true },
+  });
+  if (me && isPkwtEngagement(me.engagement_type)) {
+    redirect("/engineer/wallet");
   }
 
   const items = await getMyWithdrawals();

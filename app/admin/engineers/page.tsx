@@ -8,11 +8,9 @@ import {
 import { TableSkeleton } from "@/components/ui/skeleton";
 
 type PageProps = {
-  searchParams: Promise<{ q?: string; status?: string; page?: string }> | {
-    q?: string;
-    status?: string;
-    page?: string;
-  };
+  searchParams:
+    | Promise<{ q?: string; status?: string; engagement?: string; page?: string }>
+    | { q?: string; status?: string; engagement?: string; page?: string };
 };
 
 export default async function EngineersPage({ searchParams }: PageProps) {
@@ -21,6 +19,7 @@ export default async function EngineersPage({ searchParams }: PageProps) {
   const data = await getEngineers({
     q: params.q,
     status: params.status,
+    engagement: params.engagement,
     page,
     pageSize: 10,
   });
@@ -30,18 +29,25 @@ export default async function EngineersPage({ searchParams }: PageProps) {
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Engineers</h1>
         <p className="text-xs text-muted-foreground">
-          Field engineer freelance — skills, home base, dan status ketersediaan.
+          Field engineer Mitra (komisi) dan PKWT (payroll) — filter tipe
+          engagement di bawah.
         </p>
       </div>
 
       <Suspense fallback={<TableSkeleton rows={3} cols={4} />}>
         <SearchFilterBar
           showStatus
+          showEngagement
           placeholder="Cari nama, HP, atau kota..."
           statusOptions={[
             { value: "AVAILABLE", label: "Available" },
             { value: "BUSY", label: "Busy" },
             { value: "OFFLINE", label: "Offline" },
+          ]}
+          engagementOptions={[
+            { value: "MITRA", label: "Mitra" },
+            { value: "PKWT_OUTTASK", label: "PKWT Outtask" },
+            { value: "PKWT_INTERNAL", label: "PKWT Internal" },
           ]}
         />
       </Suspense>

@@ -40,6 +40,18 @@ export default async function EngineerTicketDetailPage({ params }: PageProps) {
     notFound();
   }
 
+  const { auth } = await import("@/lib/auth");
+  const { prisma } = await import("@/lib/prisma");
+  const { isPkwtEngagement } = await import("@/lib/eligibility");
+  const session = await auth();
+  const me = session?.user
+    ? await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { engagement_type: true },
+      })
+    : null;
+  const allowReject = !(me && isPkwtEngagement(me.engagement_type));
+
   const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${ticket.tenant.lat},${ticket.tenant.lng}`;
   const photos = collectLogPhotos(ticket.logs);
   const spareparts = await listAvailableSpareparts();
@@ -178,6 +190,7 @@ export default async function EngineerTicketDetailPage({ params }: PageProps) {
         <JobAcceptReject
           ticketId={ticket.id}
           acceptedAt={ticket.accepted_at?.toISOString() ?? null}
+          allowReject={allowReject}
         />
       )}
 

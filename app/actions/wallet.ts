@@ -80,6 +80,18 @@ export async function requestWithdrawal(
 ): Promise<ActionResult<{ id: string }>> {
   try {
     const session = await requireEngineer();
+
+    const eng = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { engagement_type: true },
+    });
+    if (eng?.engagement_type && eng.engagement_type !== "MITRA") {
+      return {
+        success: false,
+        error: "Withdraw komisi hanya untuk Mitra. PKWT memakai payroll HR.",
+      };
+    }
+
     const data = withdrawSchema.parse(input);
 
     const wallet = await prisma.engineerWallet.findUnique({

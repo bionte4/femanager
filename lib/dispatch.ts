@@ -16,7 +16,15 @@ import {
   getActiveCertifiedEngineerIds,
   skillAliasesForCategory,
 } from "@/lib/skill-match";
-import { dispatchEligibleWhere } from "@/lib/contracts";
+import {
+  dispatchEligibleWhere,
+  matchesPlacement,
+} from "@/lib/contracts";
+import { isPkwtEngagement } from "@/lib/eligibility";
+import {
+  notifyEscalateL1,
+  notifyPkwtAcceptTimeout,
+} from "@/lib/notifications";
 
 export { categoryCodeForDeviceType } from "@/lib/skill-match";
 
@@ -29,6 +37,7 @@ export type NearbyEngineer = {
   skills: string[];
   trust_score: number;
   distance_meters: number;
+  engagement_type?: string;
 };
 
 /** @deprecated gunakan categoryCodeForDeviceType */
@@ -39,33 +48,46 @@ export function skillForDeviceType(type: DeviceType | null | undefined): string 
 type FindNearbyParams = {
   tenantLat: number;
   tenantLng: number;
+  tenantId: string;
+  tenantCity: string;
+  tenantName?: string | null;
   categoryCode?: string | null;
   requiresCertification?: boolean;
   preferToolkit?: boolean;
   excludeIds?: string[];
   limit?: number;
+  /** Hanya kandidat PKWT (re-assign dalam pool penempatan) */
+  pkwtOnly?: boolean;
 };
 
 /**
- * Cari engineer cocok untuk ticket berdasarkan ServiceCategory
+ * Cari engineer cocok untuk ticket berdasarkan ServiceCategory + placement PKWT
  */
 export async function findEngineersForTicket(params: {
   tenantLat: number;
   tenantLng: number;
+  tenantId: string;
+  tenantCity: string;
+  tenantName?: string | null;
   categoryCode: string | null;
   requiresCertification: boolean;
   preferToolkit: boolean;
   excludeIds?: string[];
   limit?: number;
+  pkwtOnly?: boolean;
 }): Promise<NearbyEngineer[]> {
   return findNearbyEngineers({
     tenantLat: params.tenantLat,
     tenantLng: params.tenantLng,
+    tenantId: params.tenantId,
+    tenantCity: params.tenantCity,
+    tenantName: params.tenantName,
     categoryCode: params.categoryCode,
     requiresCertification: params.requiresCertification,
     preferToolkit: params.preferToolkit,
     excludeIds: params.excludeIds,
     limit: params.limit ?? 5,
+    pkwtOnly: params.pkwtOnly,
   });
 }
 
@@ -74,15 +96,19 @@ export async function findNearbyEngineers(
 ): Promise<NearbyEngineer[]> {
   const limit = params.limit ?? 5;
   const excludeIds = params.excludeIds ?? [];
+  const now = new Date();
 
   const engineers = await prisma.user.findMany({
     where: {
-      ...dispatchEligibleWhere(),
+      ...dispatchEligibleWhere(now),
       status: EngineerStatus.AVAILABLE,
       is_coordinator: false,
       lat: { not: null },
       lng: { not: null },
       id: excludeIds.length ? { notIn: excludeIds } : undefined,
+      ...(params.pkwtOnly
+        ? { engagement_type: { in: ["PKWT_OUTTASK", "PKWT_INTERNAL"] } }
+        : {}),
     },
     select: {
       id: true,
@@ -94,13 +120,38 @@ export async function findNearbyEngineers(
       trust_score: true,
       has_motorcycle: true,
       has_toolkit: true,
+      engagement_type: true,
+      engineer_contracts: {
+        where: {
+          status: "ACTIVE",
+          start_at: { lte: now },
+          end_at: { gte: now },
+        },
+        select: {
+          placement_cities: true,
+          placement_tenant_ids: true,
+          client_label: true,
+        },
+      },
     },
   });
 
+  const tenant = {
+    id: params.tenantId,
+    city: params.tenantCity,
+    name: params.tenantName ?? null,
+  };
+
+  // Mitra: semua. PKWT: wajib matchesPlacement pada salah satu kontrak aktif.
+  let list = engineers.filter((e) => {
+    if (!isPkwtEngagement(e.engagement_type)) return true;
+    return e.engineer_contracts.some((c) => matchesPlacement(c, tenant));
+  });
+
   // Filter skill ketat (termasuk alias EDC/LAN/WAN ↔ category code)
-  let list = params.categoryCode
-    ? engineers.filter((e) => engineerHasSkill(e.skills, params.categoryCode))
-    : engineers;
+  list = params.categoryCode
+    ? list.filter((e) => engineerHasSkill(e.skills, params.categoryCode))
+    : list;
 
   if (params.requiresCertification && params.categoryCode) {
     const certified = await getActiveCertifiedEngineerIds({
@@ -145,6 +196,7 @@ export async function findNearbyEngineers(
     skills: e.skills,
     trust_score: e.trust_score,
     distance_meters: e.distance_meters,
+    engagement_type: e.engagement_type,
   }));
 }
 
@@ -179,11 +231,11 @@ export type DispatchResult = {
 };
 
 /**
- * Auto Dispatch Engine — assign engineer terdekat cocok kategori
+ * Auto Dispatch Engine — assign engineer terdekat cocok kategori + placement
  */
 export async function autoDispatchTicket(
   ticketId: string,
-  options?: { isReassign?: boolean }
+  options?: { isReassign?: boolean; pkwtOnly?: boolean }
 ): Promise<DispatchResult> {
   const ticket = await prisma.ticket.findUnique({
     where: { id: ticketId },
@@ -250,11 +302,15 @@ export async function autoDispatchTicket(
   const nearby = await findEngineersForTicket({
     tenantLat: ticket.tenant.lat,
     tenantLng: ticket.tenant.lng,
+    tenantId: ticket.tenant.id,
+    tenantCity: ticket.tenant.city,
+    tenantName: ticket.tenant.name,
     categoryCode,
     requiresCertification: requiresCert,
     preferToolkit,
     excludeIds: isReassign ? excludeForReassign : triedEngineerIds,
     limit: Math.max(5, requiredEngineers + 2),
+    pkwtOnly: options?.pkwtOnly,
   });
 
   if (nearby.length === 0) {
@@ -272,8 +328,8 @@ export async function autoDispatchTicket(
           status_from: ticket.status,
           status_to: TicketStatus.ESCALATED,
           notes: categoryCode
-            ? `Auto-dispatch gagal: tidak ada FE${aliasHint}${requiresCert ? " + sertifikasi aktif" : ""} di dekat lokasi`
-            : "Auto-dispatch gagal: tidak ada engineer AVAILABLE di dekat lokasi",
+            ? `Auto-dispatch gagal: tidak ada FE${aliasHint}${requiresCert ? " + sertifikasi aktif" : ""}${options?.pkwtOnly ? " (pool PKWT penempatan)" : ""} di dekat lokasi`
+            : `Auto-dispatch gagal: tidak ada engineer AVAILABLE${options?.pkwtOnly ? " di pool PKWT" : ""} di dekat lokasi`,
           photo_url: [],
         },
       });
@@ -282,6 +338,12 @@ export async function autoDispatchTicket(
     void import("@/lib/webhook").then(({ triggerExternalWebhook }) =>
       triggerExternalWebhook(ticket.id, TicketStatus.ESCALATED)
     );
+
+    void notifyEscalateL1({
+      id: ticket.id,
+      ticket_no: ticket.ticket_no,
+      reason: "Auto-dispatch gagal — tidak ada FE cocok",
+    });
 
     return {
       success: false,
@@ -336,8 +398,8 @@ export async function autoDispatchTicket(
         status_from: ticket.status,
         status_to: TicketStatus.ASSIGNED,
         notes: isReassign
-          ? `Auto re-assign #${attempt} ke ${engineer.full_name} (${Math.round(engineer.distance_meters)}m)`
-          : `Auto-dispatch ke ${engineer.full_name} (${Math.round(engineer.distance_meters)}m)${categoryCode ? ` · ${categoryCode}` : ""}${requiresCert ? " · cert OK" : ""}${requiredEngineers > 1 ? ` · butuh ${requiredEngineers} FE` : ""}`,
+          ? `Auto re-assign #${attempt} ke ${engineer.full_name} (${Math.round(engineer.distance_meters)}m)${engineer.engagement_type && isPkwtEngagement(engineer.engagement_type) ? " · PKWT" : ""}`
+          : `Auto-dispatch ke ${engineer.full_name} (${Math.round(engineer.distance_meters)}m)${categoryCode ? ` · ${categoryCode}` : ""}${requiresCert ? " · cert OK" : ""}${requiredEngineers > 1 ? ` · butuh ${requiredEngineers} FE` : ""}${engineer.engagement_type && isPkwtEngagement(engineer.engagement_type) ? " · PKWT" : ""}`,
         photo_url: [],
       },
     });
@@ -348,6 +410,14 @@ export async function autoDispatchTicket(
     : buildDispatchMessage(ticket.ticket_no, ticket.tenant.name);
 
   await sendWhatsApp({ phone: engineer.phone, message });
+
+  void import("@/lib/notifications").then(({ notifyAssigned }) =>
+    notifyAssigned(engineer.id, {
+      id: ticket.id,
+      ticket_no: ticket.ticket_no,
+      tenantName: ticket.tenant.name,
+    })
+  );
 
   // Paket besar: notify FE tambahan sebagai helper (primary tetap nearby[0])
   if (requiredEngineers > 1) {
@@ -368,6 +438,93 @@ export async function autoDispatchTicket(
   };
 }
 
+/**
+ * PKWT timeout accept → escalate supervisor, jangan open-market re-assign.
+ */
+export async function escalatePkwtAcceptTimeout(
+  ticketId: string
+): Promise<{ success: boolean; error?: string }> {
+  const ticket = await prisma.ticket.findUnique({
+    where: { id: ticketId },
+    include: {
+      assigned_engineer: {
+        select: { id: true, full_name: true, engagement_type: true },
+      },
+    },
+  });
+
+  if (!ticket) return { success: false, error: "Ticket tidak ditemukan" };
+  if (ticket.status !== TicketStatus.ASSIGNED || ticket.accepted_at) {
+    return { success: false, error: "Status tidak perlu escalate timeout" };
+  }
+
+  const eng = ticket.assigned_engineer;
+  const engName = eng?.full_name ?? "PKWT";
+
+  await prisma.$transaction(async (tx) => {
+    if (eng) {
+      await tx.user.update({
+        where: { id: eng.id },
+        data: { status: EngineerStatus.AVAILABLE },
+      });
+      await tx.complianceLog.create({
+        data: {
+          engineer_id: eng.id,
+          type: "JOB_TIMEOUT",
+          ticket_id: ticket.id,
+          metadata: {
+            timeout_minutes: 15,
+            engagement: eng.engagement_type,
+            policy: "PKWT_NO_OPEN_MARKET",
+          },
+        },
+      });
+    }
+
+    await tx.ticket.update({
+      where: { id: ticket.id },
+      data: {
+        status: TicketStatus.ESCALATED,
+        assigned_engineer_id: null,
+        last_assigned_at: null,
+        accepted_at: null,
+        tried_engineer_ids: eng
+          ? Array.from(new Set([...(ticket.tried_engineer_ids ?? []), eng.id]))
+          : ticket.tried_engineer_ids,
+      },
+    });
+
+    await tx.ticketLog.create({
+      data: {
+        ticket_id: ticket.id,
+        status_from: TicketStatus.ASSIGNED,
+        status_to: TicketStatus.ESCALATED,
+        changed_by: eng?.id,
+        notes: `Timeout accept PKWT (${engName}) — eskalasi supervisor, tidak re-assign open market`,
+        photo_url: [],
+      },
+    });
+  });
+
+  void notifyPkwtAcceptTimeout({
+    id: ticket.id,
+    ticket_no: ticket.ticket_no,
+    engineerName: engName,
+  });
+
+  void notifyEscalateL1({
+    id: ticket.id,
+    ticket_no: ticket.ticket_no,
+    reason: `Timeout accept PKWT (${engName})`,
+  });
+
+  void import("@/lib/webhook").then(({ triggerExternalWebhook }) =>
+    triggerExternalWebhook(ticket.id, TicketStatus.ESCALATED)
+  );
+
+  return { success: true };
+}
+
 /** Timeout accept job sebelum auto re-assign (cron + UI countdown) */
 export const ACCEPT_TIMEOUT_MS = 15 * 60 * 1000;
 
@@ -380,12 +537,15 @@ export function getAcceptDeadline(lastAssignedAt: Date | string): Date {
 }
 
 /**
- * Cron: ticket ASSIGNED belum accept >15 menit → log TIMEOUT + re-dispatch
+ * Cron: ticket ASSIGNED belum accept >15 menit
+ * — Mitra: re-dispatch open market
+ * — PKWT: escalate supervisor (bukan open market)
  */
 export async function processDispatchTimeouts(): Promise<{
   checked: number;
   reassigned: number;
   escalated: number;
+  pkwt_escalated: number;
 }> {
   const cutoff = new Date(Date.now() - ACCEPT_TIMEOUT_MS);
   const stale = await prisma.ticket.findMany({
@@ -394,14 +554,28 @@ export async function processDispatchTimeouts(): Promise<{
       accepted_at: null,
       last_assigned_at: { lte: cutoff },
     },
-    select: { id: true, assigned_engineer_id: true },
+    select: {
+      id: true,
+      assigned_engineer_id: true,
+      assigned_engineer: {
+        select: { id: true, engagement_type: true },
+      },
+    },
     take: 50,
   });
 
   let reassigned = 0;
   let escalated = 0;
+  let pkwtEscalated = 0;
 
   for (const t of stale) {
+    const engagement = t.assigned_engineer?.engagement_type;
+    if (engagement && isPkwtEngagement(engagement)) {
+      const res = await escalatePkwtAcceptTimeout(t.id);
+      if (res.success) pkwtEscalated += 1;
+      continue;
+    }
+
     if (t.assigned_engineer_id) {
       await prisma.complianceLog.create({
         data: {
@@ -417,5 +591,10 @@ export async function processDispatchTimeouts(): Promise<{
     else if (result.escalated) escalated += 1;
   }
 
-  return { checked: stale.length, reassigned, escalated };
+  return {
+    checked: stale.length,
+    reassigned,
+    escalated,
+    pkwt_escalated: pkwtEscalated,
+  };
 }

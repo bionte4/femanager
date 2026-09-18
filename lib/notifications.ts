@@ -99,6 +99,24 @@ export async function notifyEscalateL1(ticket: {
   });
 }
 
+/** PKWT tidak accept dalam 15 menit — jangan open-market re-assign */
+export async function notifyPkwtAcceptTimeout(ticket: {
+  id: string;
+  ticket_no: string;
+  engineerName: string;
+}) {
+  return notifyRoles(
+    [Role.NOC_L1, Role.ADMIN_NOC, Role.DISPATCHER, Role.SUPER_ADMIN],
+    {
+      title: `Timeout accept PKWT · ${ticket.ticket_no}`,
+      body: `${ticket.engineerName} tidak accept dalam 15 menit — butuh assign manual / supervisor`,
+      href: `/admin/tickets/${ticket.id}`,
+      type: "PKWT_ACCEPT_TIMEOUT",
+      ticket_id: ticket.id,
+    }
+  );
+}
+
 export async function notifyAssigned(
   engineerId: string,
   ticket: {

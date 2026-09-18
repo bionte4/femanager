@@ -115,6 +115,40 @@ export function parseCities(raw: string | string[] | undefined): string[] {
     .filter(Boolean);
 }
 
+export type PlacementContract = {
+  placement_cities: string[];
+  placement_tenant_ids: string[];
+  client_label?: string | null;
+};
+
+export type PlacementTenant = {
+  id: string;
+  city: string;
+  name?: string | null;
+};
+
+/**
+ * Fase 1 placement: tenant_ids ketat, lalu cities[].
+ * Tanpa batasan → boleh semua kota. client_label hanya label admin (bukan filter keras).
+ */
+export function matchesPlacement(
+  contract: PlacementContract,
+  tenant: PlacementTenant
+): boolean {
+  const tenantIds = contract.placement_tenant_ids ?? [];
+  if (tenantIds.length > 0) {
+    return tenantIds.includes(tenant.id);
+  }
+
+  const cities = contract.placement_cities ?? [];
+  if (cities.length > 0) {
+    const city = tenant.city.trim().toLowerCase();
+    return cities.some((c) => c.trim().toLowerCase() === city);
+  }
+
+  return true;
+}
+
 /** Prisma where: FE eligible untuk dispatch (Mitra signed ATAU PKWT + kontrak aktif) */
 export function dispatchEligibleWhere(
   now = new Date()

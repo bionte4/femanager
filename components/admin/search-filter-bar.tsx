@@ -16,9 +16,11 @@ import {
 type SearchFilterBarProps = {
   cities?: string[];
   statusOptions?: { value: string; label: string }[];
+  engagementOptions?: { value: string; label: string }[];
   placeholder?: string;
   showCity?: boolean;
   showStatus?: boolean;
+  showEngagement?: boolean;
   /** Tombol aksi di kanan (Tambah, dll) — satu baris dengan filter */
   actions?: React.ReactNode;
 };
@@ -26,9 +28,11 @@ type SearchFilterBarProps = {
 export function SearchFilterBar({
   cities = [],
   statusOptions = [],
+  engagementOptions = [],
   placeholder = "Cari...",
   showCity = false,
   showStatus = false,
+  showEngagement = false,
   actions,
 }: SearchFilterBarProps) {
   const router = useRouter();
@@ -94,6 +98,25 @@ export function SearchFilterBar({
           <SelectContent>
             <SelectItem value="all">Semua status</SelectItem>
             {statusOptions.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+
+      {showEngagement && (
+        <Select
+          defaultValue={searchParams.get("engagement") ?? "all"}
+          onValueChange={(v) => update("engagement", v)}
+        >
+          <SelectTrigger className="w-full sm:w-40">
+            <SelectValue placeholder="Semua tipe" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Semua tipe</SelectItem>
+            {engagementOptions.map((opt) => (
               <SelectItem key={opt.value} value={opt.value}>
                 {opt.label}
               </SelectItem>

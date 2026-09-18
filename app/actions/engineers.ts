@@ -22,6 +22,7 @@ type ActionResult<T = undefined> =
 export async function getEngineers(params: {
   q?: string;
   status?: string;
+  engagement?: string;
   page?: number;
   pageSize?: number;
 }) {
@@ -29,12 +30,19 @@ export async function getEngineers(params: {
   const page = Math.max(1, params.page ?? 1);
   const pageSize = Math.min(50, Math.max(5, params.pageSize ?? 10));
   const q = params.q?.trim();
+  const engagement = params.engagement?.trim();
 
   const where: Prisma.UserWhereInput = {
     role: Role.FIELD_ENGINEER,
     AND: [
       params.status
         ? { status: params.status as Prisma.EnumEngineerStatusFilter["equals"] }
+        : {},
+      engagement
+        ? {
+            engagement_type:
+              engagement as Prisma.EnumEngagementTypeFilter["equals"],
+          }
         : {},
       q
         ? {
@@ -66,6 +74,9 @@ export async function getEngineers(params: {
         skills: true,
         status: true,
         rating: true,
+        engagement_type: true,
+        employment_status: true,
+        partnership_status: true,
         created_at: true,
       },
     }),

@@ -37,6 +37,7 @@ async function requireEligibleEngineer() {
       id: true,
       trust_score: true,
       role: true,
+      engagement_type: true,
     },
   });
   if (!user) throw new Error("Unauthorized");
@@ -113,6 +114,19 @@ export async function rejectJobAction(input: {
 }): Promise<{ success: boolean; error?: string }> {
   try {
     const user = await requireEligibleEngineer();
+
+    // PKWT: hard-block reject — tugas penempatan, bukan job open market
+    if (
+      user.engagement_type === "PKWT_OUTTASK" ||
+      user.engagement_type === "PKWT_INTERNAL"
+    ) {
+      return {
+        success: false,
+        error:
+          "Karyawan PKWT tidak dapat menolak tugas. Hubungi supervisor/NOC jika berhalangan.",
+      };
+    }
+
     const ticket = await prisma.ticket.findUnique({
       where: { id: input.ticket_id },
     });

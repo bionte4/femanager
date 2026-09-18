@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
   eligibleForWork,
+  engagementLabel,
   isMitraEngagement,
   isPkwtEngagement,
 } from "@/lib/eligibility";
@@ -12,6 +13,7 @@ import { PwaRegister } from "@/components/engineer/pwa-register";
 import { PushRegister } from "@/components/engineer/push-register";
 import { KbChatWidget } from "@/components/kb/kb-chat-widget";
 import { EngineerLogoutButton } from "@/components/engineer/logout-button";
+import { Badge } from "@/components/ui/badge";
 
 export default async function EngineerLayout({
   children,
@@ -78,9 +80,14 @@ export default async function EngineerLayout({
             <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
               FE-Track
             </p>
-            <p className="text-base font-semibold leading-tight">
-              Halo, {session.user.name?.split(" ")[0] ?? "Engineer"}
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-base font-semibold leading-tight">
+                Halo, {session.user.name?.split(" ")[0] ?? "Engineer"}
+              </p>
+              <Badge variant="outline" className="h-5 px-1.5 text-[10px] font-normal">
+                {engagementLabel(engagement)}
+              </Badge>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <EngineerLogoutButton className="h-8 px-2 text-xs text-muted-foreground" />
@@ -100,7 +107,7 @@ export default async function EngineerLayout({
         {children}
       </main>
 
-      {canWork && <EngineerBottomNav />}
+      {canWork && <EngineerBottomNav isPkwt={isPkwt} />}
       {canWork && <KbChatWidget audience="engineer" />}
     </div>
   );

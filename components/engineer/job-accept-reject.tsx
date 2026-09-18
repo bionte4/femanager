@@ -28,9 +28,12 @@ import { Input } from "@/components/ui/input";
 export function JobAcceptReject({
   ticketId,
   acceptedAt,
+  allowReject = true,
 }: {
   ticketId: string;
   acceptedAt: string | null;
+  /** false untuk PKWT — hard-block reject */
+  allowReject?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -41,7 +44,9 @@ export function JobAcceptReject({
   if (acceptedAt) {
     return (
       <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
-        Job sudah diterima — lanjut status berikutnya.
+        {allowReject
+          ? "Job sudah diterima — lanjut status berikutnya."
+          : "Tugas sudah diterima — lanjut status berikutnya."}
       </p>
     );
   }
@@ -53,7 +58,7 @@ export function JobAcceptReject({
         toast.error(res.error);
         return;
       }
-      toast.success("Job diterima");
+      toast.success(allowReject ? "Job diterima" : "Tugas diterima");
       router.refresh();
     });
   }
@@ -74,6 +79,25 @@ export function JobAcceptReject({
       router.push("/engineer/my-tickets");
       router.refresh();
     });
+  }
+
+  if (!allowReject) {
+    return (
+      <div className="space-y-3">
+        <Button
+          size="lg"
+          className="h-16 w-full text-base font-bold"
+          disabled={pending}
+          onClick={accept}
+        >
+          TERIMA TUGAS
+        </Button>
+        <p className="text-center text-xs text-muted-foreground">
+          Akun PKWT tidak dapat menolak tugas penempatan. Jika berhalangan,
+          hubungi supervisor/NOC.
+        </p>
+      </div>
+    );
   }
 
   return (

@@ -37,7 +37,16 @@ type EngineerRow = {
   skills: string[];
   status: EngineerStatus;
   rating: number;
+  engagement_type?: string;
+  employment_status?: string;
+  partnership_status?: string;
 };
+
+function engagementBadge(type?: string) {
+  if (type === "PKWT_OUTTASK") return { label: "PKWT Outtask", variant: "secondary" as const };
+  if (type === "PKWT_INTERNAL") return { label: "PKWT Internal", variant: "secondary" as const };
+  return { label: "Mitra", variant: "outline" as const };
+}
 
 function statusVariant(status: EngineerStatus) {
   if (status === "AVAILABLE") return "success" as const;
@@ -89,6 +98,7 @@ export function EngineersTable({ items }: { items: EngineerRow[] }) {
               <TableHead>Nama</TableHead>
               <TableHead className="hidden sm:table-cell">HP</TableHead>
               <TableHead className="hidden md:table-cell">Lokasi</TableHead>
+              <TableHead>Tipe</TableHead>
               <TableHead>Skills</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="hidden lg:table-cell">Rating</TableHead>
@@ -98,7 +108,7 @@ export function EngineersTable({ items }: { items: EngineerRow[] }) {
           <TableBody>
             {items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="p-0">
+                <TableCell colSpan={8} className="p-0">
                   <EmptyState
                     title="Belum ada engineer"
                     description="Tambah field engineer untuk mulai auto-dispatch."
@@ -107,7 +117,9 @@ export function EngineersTable({ items }: { items: EngineerRow[] }) {
                 </TableCell>
               </TableRow>
             ) : (
-              items.map((e) => (
+              items.map((e) => {
+                const eng = engagementBadge(e.engagement_type);
+                return (
                 <TableRow key={e.id}>
                   <TableCell>
                     <Link
@@ -124,6 +136,9 @@ export function EngineersTable({ items }: { items: EngineerRow[] }) {
                   <TableCell className="hidden md:table-cell">
                     {e.city ?? "-"}
                     {e.district ? `, ${e.district}` : ""}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={eng.variant}>{eng.label}</Badge>
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
@@ -167,7 +182,8 @@ export function EngineersTable({ items }: { items: EngineerRow[] }) {
                     </div>
                   </TableCell>
                 </TableRow>
-              ))
+              );
+              })
             )}
           </TableBody>
         </Table>

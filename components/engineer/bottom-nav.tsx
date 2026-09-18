@@ -5,7 +5,15 @@ import { usePathname } from "next/navigation";
 import { Ticket, History, Wallet, User, Trophy, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const NAV_ITEMS = [
+type NavItem = {
+  href: string;
+  label: string;
+  icon: typeof Ticket;
+  match: string[];
+  mitraOnly?: boolean;
+};
+
+const NAV_ITEMS: NavItem[] = [
   {
     href: "/engineer/my-tickets",
     label: "Ticket",
@@ -23,6 +31,7 @@ const NAV_ITEMS = [
     label: "Rank",
     icon: Trophy,
     match: ["/engineer/leaderboard"],
+    mitraOnly: true,
   },
   {
     href: "/engineer/kb",
@@ -35,6 +44,7 @@ const NAV_ITEMS = [
     label: "Wallet",
     icon: Wallet,
     match: ["/engineer/wallet", "/engineer/withdrawals"],
+    mitraOnly: true,
   },
   {
     href: "/engineer/profile",
@@ -42,15 +52,21 @@ const NAV_ITEMS = [
     icon: User,
     match: ["/engineer/profile", "/engineer/agreement"],
   },
-] as const;
+];
 
-export function EngineerBottomNav() {
+export function EngineerBottomNav({
+  isPkwt = false,
+}: {
+  /** PKWT: sembunyikan Wallet & Rank mitra */
+  isPkwt?: boolean;
+}) {
   const pathname = usePathname();
+  const items = NAV_ITEMS.filter((item) => !(isPkwt && item.mitraOnly));
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur supports-[backdrop-filter]:bg-background/80">
       <ul className="mx-auto flex h-14 max-w-lg items-stretch">
-        {NAV_ITEMS.map(({ href, label, icon: Icon, match }) => {
+        {items.map(({ href, label, icon: Icon, match }) => {
           const active = match.some((m) => pathname.startsWith(m));
           return (
             <li key={href} className="flex-1">
