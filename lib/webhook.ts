@@ -206,6 +206,26 @@ export async function sendToCustomer(
     console.error("[webhook] gagal simpan last_response:", e);
   }
 
+  // Gagal semua attempt → masuk DLQ untuk retry async
+  if (!last.success) {
+    try {
+      const { enqueueWebhookDeadLetter } = await import("@/lib/webhook-dlq");
+      await enqueueWebhookDeadLetter({
+        integration_id: integration.id,
+        ticket_id: ticketId,
+        external_ticket_id: externalTicketId,
+        event,
+        payload,
+        attempts: last.attempts,
+        last_error: last.error ?? last.body ?? `HTTP ${last.status}`,
+        last_http_status: last.status ?? null,
+      });
+      console.warn(`[webhook] → DLQ event=${event} ticket=${ticketId}`);
+    } catch (e) {
+      console.error("[webhook] gagal enqueue DLQ:", e);
+    }
+  }
+
   return last;
 }
 

@@ -148,6 +148,39 @@ export async function updateTicketStatusAction(
       return { success: false, error: "Ticket tidak ditemukan" };
     }
 
+    // Conflict resolve untuk offline sync
+    if (
+      parsed.expected_from_status &&
+      ticket.status !== parsed.expected_from_status
+    ) {
+      const ORDER: TicketStatus[] = [
+        TicketStatus.OPEN,
+        TicketStatus.ASSIGNED,
+        TicketStatus.ON_THE_WAY,
+        TicketStatus.ON_SITE,
+        TicketStatus.IN_PROGRESS,
+        TicketStatus.PENDING_SPAREPART,
+        TicketStatus.PENDING_L1,
+        TicketStatus.ESCALATED,
+        TicketStatus.PENDING_REVIEW,
+        TicketStatus.RESOLVED,
+        TicketStatus.CLOSED,
+      ];
+      const curIdx = ORDER.indexOf(ticket.status);
+      const targetIdx = ORDER.indexOf(parsed.status);
+      // Server sudah lebih maju dari target → conflict (drop offline action)
+      if (
+        ticket.status === TicketStatus.RESOLVED ||
+        ticket.status === TicketStatus.CLOSED ||
+        (curIdx >= 0 && targetIdx >= 0 && curIdx >= targetIdx)
+      ) {
+        return {
+          success: false,
+          error: `CONFLICT: status sudah ${ticket.status}, aksi offline ${parsed.expected_from_status}→${parsed.status} dibatalkan`,
+        };
+      }
+    }
+
     const isAdmin = (ADMIN_ROLES as readonly string[]).includes(session.user.role);
     const isOwner =
       session.user.role === Role.FIELD_ENGINEER &&
@@ -488,7 +521,10 @@ export async function assignEngineerAction(
     const [ticket, engineer] = await Promise.all([
       prisma.ticket.findUnique({
         where: { id: parsed.ticket_id },
-        include: { device: true },
+        include: {
+          service_category: true,
+          device: { include: { service_category: true } },
+        },
       }),
       prisma.user.findFirst({
         where: { id: parsed.engineer_id, role: Role.FIELD_ENGINEER },
@@ -498,19 +534,51 @@ export async function assignEngineerAction(
     if (!ticket) return { success: false, error: "Ticket tidak ditemukan" };
     if (!engineer) return { success: false, error: "Engineer tidak ditemukan" };
 
-    const isSdwan =
-      ticket.device?.device_category === "ROUTER_SDWAN" ||
-      ticket.device?.type === "ROUTER_SDWAN";
-    if (isSdwan) {
-      const { filterSdwanEligibleEngineers } = await import("@/lib/dispatch");
-      const ok = await filterSdwanEligibleEngineers([engineer.id]);
-      if (ok.length === 0) {
-        return {
-          success: false,
-          error:
-            "Engineer belum eligible SDWAN (sertifikasi SDWAN + trust>85 + ≥20 ticket)",
-        };
+    const { resolveTicketCategory, assertEngineerEligibleForTicket } =
+      await import("@/lib/skill-match");
+    const { categoryCode, requiresCertification } = await resolveTicketCategory({
+      service_category: ticket.service_category
+        ? {
+            code: ticket.service_category.code,
+            requires_certification: ticket.service_category.requires_certification,
+          }
+        : null,
+      device: ticket.device
+        ? {
+            type: ticket.device.type,
+            service_category: ticket.device.service_category
+              ? {
+                  code: ticket.device.service_category.code,
+                  requires_certification:
+                    ticket.device.service_category.requires_certification,
+                }
+              : null,
+          }
+        : null,
+    });
+
+    // Jika service_category belum di-include penuh, fetch category
+    let catCode = categoryCode;
+    let reqCert = requiresCertification;
+    if (!catCode && ticket.service_category_id) {
+      const cat = await prisma.serviceCategory.findUnique({
+        where: { id: ticket.service_category_id },
+      });
+      if (cat) {
+        catCode = cat.code;
+        reqCert = cat.requires_certification || cat.code === "SDWAN";
       }
+    }
+
+    const eligibility = await assertEngineerEligibleForTicket({
+      engineerId: engineer.id,
+      skills: engineer.skills,
+      categoryCode: catCode,
+      requiresCertification: reqCert,
+      trustScore: engineer.trust_score,
+    });
+    if (!eligibility.ok) {
+      return { success: false, error: eligibility.error };
     }
 
     const now = new Date();

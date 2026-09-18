@@ -10,6 +10,10 @@ import {
   claimL1TicketAction,
   escalateToL1Action,
 } from "@/app/actions/routing";
+import {
+  HandoverEscalateDialog,
+  type HandoverFormValue,
+} from "@/components/ticket/handover-form";
 import { PriorityBadge, TicketStatusBadge } from "@/components/ticket/status-badge";
 import { SLACountdown } from "@/components/sla-countdown/sla-countdown";
 import { Button } from "@/components/ui/button";
@@ -58,18 +62,29 @@ export function RoutingQueuesClient({
   const router = useRouter();
   const [tab, setTab] = useState<"l0" | "l1">(initialTab);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [handoverTicket, setHandoverTicket] = useState<QueueTicket | null>(null);
 
   const rows = tab === "l0" ? l0 : l1;
 
-  async function onEscalate(id: string) {
-    setBusyId(id);
-    const result = await escalateToL1Action({ ticket_id: id });
+  async function onEscalate(handover: HandoverFormValue) {
+    if (!handoverTicket) return;
+    setBusyId(handoverTicket.id);
+    const result = await escalateToL1Action({
+      ticket_id: handoverTicket.id,
+      handover: {
+        symptoms: handover.symptoms,
+        last_ping: handover.last_ping,
+        remote_actions: handover.remote_actions,
+        notes: handover.notes || null,
+      },
+    });
     setBusyId(null);
     if (!result.success) {
       toast.error(result.error);
       return;
     }
     toast.success("Escalated ke L1");
+    setHandoverTicket(null);
     router.refresh();
   }
 
@@ -90,11 +105,11 @@ export function RoutingQueuesClient({
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Routing Queue</h1>
         <p className="text-xs text-muted-foreground">
-          L0 standby & escalate · L1 cek device & assign field engineer
+          L0 standby & escalate (wajib handover) · L1 cek device & assign FE
         </p>
       </div>
 
-      <div className="flex gap-1 rounded-md border bg-muted/40 p-0.5 w-fit">
+      <div className="flex w-fit gap-1 rounded-md border bg-muted/40 p-0.5">
         <button
           type="button"
           onClick={() => setTab("l0")}
@@ -195,7 +210,7 @@ export function RoutingQueuesClient({
                           variant="destructive"
                           className="h-7 text-xs"
                           disabled={busyId === t.id}
-                          onClick={() => onEscalate(t.id)}
+                          onClick={() => setHandoverTicket(t)}
                         >
                           <ArrowUpRight className="h-3 w-3" />
                           ke L1
@@ -223,6 +238,16 @@ export function RoutingQueuesClient({
           </Table>
         </div>
       )}
+
+      <HandoverEscalateDialog
+        open={!!handoverTicket}
+        onOpenChange={(v) => {
+          if (!v) setHandoverTicket(null);
+        }}
+        ticketNo={handoverTicket?.ticket_no}
+        loading={busyId === handoverTicket?.id}
+        onSubmit={onEscalate}
+      />
     </div>
   );
 }

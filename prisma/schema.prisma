@@ -295,6 +295,8 @@ model Ticket {
   stop_clock_reason     String?
   escalated_to_l1_at    DateTime?
   escalated_by_id       String?
+  /// Handover L0→L1: { symptoms, last_ping, remote_actions[], notes, handed_over_at, handed_over_by }
+  l1_handover           Json?
   commission_calculated Boolean      @default(false)
   commission_amount     Int?
   sdwan_checklist       Json?
@@ -374,6 +376,7 @@ model Integration {
   updated_at       DateTime         @updatedAt
 
   external_tickets ExternalTicket[]
+  dead_letters     WebhookDeadLetter[]
 
   @@map("integrations")
 }
@@ -727,4 +730,29 @@ model AppNotification {
   @@index([user_id, read_at])
   @@index([created_at])
   @@map("app_notifications")
+}
+
+/// Dead-letter queue outbound webhook ke customer ITSM
+model WebhookDeadLetter {
+  id                 String    @id @default(cuid())
+  integration_id     String
+  ticket_id          String?
+  external_ticket_id String?
+  event              String
+  payload            Json
+  attempts           Int       @default(0)
+  last_error         String?
+  last_http_status   Int?
+  /// PENDING | RETRYING | DEAD | SUCCEEDED
+  status             String    @default("PENDING")
+  next_retry_at      DateTime  @default(now())
+  created_at         DateTime  @default(now())
+  resolved_at        DateTime?
+
+  integration Integration @relation(fields: [integration_id], references: [id], onDelete: Cascade)
+
+  @@index([status, next_retry_at])
+  @@index([integration_id])
+  @@index([created_at])
+  @@map("webhook_dead_letters")
 }

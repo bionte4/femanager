@@ -47,6 +47,8 @@ export const updateTicketStatusSchema = z.object({
   exif_lat: z.number().optional().nullable(),
   exif_lng: z.number().optional().nullable(),
   exif_timestamp: z.string().optional().nullable(),
+  /** Offline sync: status yang diharapkan saat aksi di-queue */
+  expected_from_status: ticketStatusEnum.optional().nullable(),
 });
 
 export const assignEngineerSchema = z.object({

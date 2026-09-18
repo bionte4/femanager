@@ -18,7 +18,8 @@ function isStaleClient(client: PrismaClient): boolean {
   const c = client as unknown as Record<string, { findMany?: unknown }>;
   return (
     typeof c.serviceCategory?.findMany !== "function" ||
-    typeof c.appNotification?.findMany !== "function"
+    typeof c.appNotification?.findMany !== "function" ||
+    typeof c.webhookDeadLetter?.findMany !== "function"
   );
 }
 

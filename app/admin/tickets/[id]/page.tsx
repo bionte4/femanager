@@ -13,8 +13,10 @@ import { PhotoGallery } from "@/components/ticket/photo-gallery";
 import { collectLogPhotos } from "@/lib/tickets/photos";
 import { TicketActionsPanel } from "@/components/ticket/ticket-actions-panel";
 import { TicketAntiFraudSection } from "@/components/ticket/ticket-antifraud-section";
+import { HandoverCard } from "@/components/ticket/handover-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { computeSlaPhases, formatPhase } from "@/lib/sla-phases";
 
 type PageProps = {
   params: Promise<{ id: string }> | { id: string };
@@ -35,6 +37,15 @@ export default async function TicketDetailPage({ params }: PageProps) {
   if (!ticket) notFound();
 
   const photos = collectLogPhotos(ticket.logs);
+  const phases = computeSlaPhases({
+    created_at: ticket.created_at,
+    response_at: ticket.response_at,
+    accepted_at: ticket.accepted_at,
+    resolved_at: ticket.resolved_at,
+    sla_paused_at: ticket.sla_paused_at,
+    sla_paused_total_ms: ticket.sla_paused_total_ms,
+    logs: ticket.logs,
+  });
 
   return (
     <div className="space-y-3">
@@ -144,6 +155,29 @@ export default async function TicketDetailPage({ params }: PageProps) {
 
           <Card>
             <CardHeader>
+              <CardTitle className="text-base">SLA by Phase</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {[
+                ["Response", phases.response_ms],
+                ["Travel", phases.travel_ms],
+                ["On-site", phases.onsite_ms],
+                ["Repair", phases.repair_ms],
+                ["Pause", phases.pause_ms > 0 ? phases.pause_ms : null],
+                ["Active", phases.active_ms],
+              ].map(([label, ms]) => (
+                <div key={String(label)} className="rounded-md border px-2.5 py-2">
+                  <p className="text-[10px] text-muted-foreground">{label}</p>
+                  <p className="font-mono text-sm font-semibold">
+                    {formatPhase(ms as number | null)}
+                  </p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle className="text-base">Dokumentasi Before / After</CardTitle>
             </CardHeader>
             <CardContent>
@@ -167,17 +201,35 @@ export default async function TicketDetailPage({ params }: PageProps) {
           />
         </div>
 
-        <TicketActionsPanel
-          ticketId={ticket.id}
-          currentStatus={ticket.status}
-          assignedEngineerId={ticket.assigned_engineer_id}
-          engineers={engineers}
-          slaPausedAt={ticket.sla_paused_at}
-          stopClockReason={ticket.stop_clock_reason}
-          canEscalateL0={(NOC_L0_ROLES as readonly string[]).includes(
-            session.user.role
-          )}
-        />
+        <div className="space-y-3">
+          <HandoverCard
+            handover={
+              ticket.l1_handover &&
+              typeof ticket.l1_handover === "object" &&
+              !Array.isArray(ticket.l1_handover)
+                ? (ticket.l1_handover as {
+                    symptoms?: string;
+                    last_ping?: string;
+                    remote_actions?: string[];
+                    notes?: string | null;
+                    handed_over_at?: string;
+                  })
+                : null
+            }
+          />
+          <TicketActionsPanel
+            ticketId={ticket.id}
+            ticketNo={ticket.ticket_no}
+            currentStatus={ticket.status}
+            assignedEngineerId={ticket.assigned_engineer_id}
+            engineers={engineers}
+            slaPausedAt={ticket.sla_paused_at}
+            stopClockReason={ticket.stop_clock_reason}
+            canEscalateL0={(NOC_L0_ROLES as readonly string[]).includes(
+              session.user.role
+            )}
+          />
+        </div>
       </div>
     </div>
   );

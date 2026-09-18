@@ -2,8 +2,13 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Download, Filter } from "lucide-react";
+import { Download, FileText, Filter, Timer } from "lucide-react";
+import { toast } from "sonner";
 import type { ReportRow } from "@/lib/reports";
+import type { PhaseAverages } from "@/lib/sla-phases";
+import { formatPhase } from "@/lib/sla-phases";
+import { fetchCustomerSlaReportAction } from "@/app/actions/reports";
+import { downloadCustomerSlaPdf } from "@/lib/reports/customer-sla-pdf";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,6 +34,7 @@ import Link from "next/link";
 type FilterOptions = {
   cities: string[];
   engineers: { id: string; full_name: string; city: string | null }[];
+  tenants: { id: string; name: string; code: string; city: string }[];
   sla_tiers: { value: string; label: string }[];
 };
 
@@ -41,20 +47,24 @@ type Props = {
     city: string;
     engineer_id: string;
     sla_tier: string;
+    tenant_id: string;
   };
+  phaseSummary: PhaseAverages;
 };
 
-export function ReportsClient({ rows, options, filters }: Props) {
+export function ReportsClient({ rows, options, filters, phaseSummary }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [pending, startTransition] = useTransition();
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   const [from, setFrom] = useState(filters.from);
   const [to, setTo] = useState(filters.to);
   const [city, setCity] = useState(filters.city || "all");
   const [engineerId, setEngineerId] = useState(filters.engineer_id || "all");
   const [slaTier, setSlaTier] = useState(filters.sla_tier || "all");
+  const [tenantId, setTenantId] = useState(filters.tenant_id || "all");
 
   const summary = useMemo(() => {
     const meet = rows.filter((r) => r.sla_status === "meet").length;
@@ -75,6 +85,7 @@ export function ReportsClient({ rows, options, filters }: Props) {
     setOrDel("city", city);
     setOrDel("engineer_id", engineerId);
     setOrDel("sla_tier", slaTier);
+    setOrDel("tenant_id", tenantId);
     startTransition(() => {
       router.push(`${pathname}?${params.toString()}`);
     });
@@ -85,12 +96,18 @@ export function ReportsClient({ rows, options, filters }: Props) {
     const data = rows.map((r) => ({
       ticket_no: r.ticket_no,
       tenant: r.tenant,
+      tenant_code: r.tenant_code,
       city: r.city,
       sla_tier: r.sla_tier,
       engineer: r.engineer,
       open_at: formatDt(r.open_at),
       resolved_at: r.resolved_at ? formatDt(r.resolved_at) : "",
       durasi: r.duration,
+      response: r.phase_response,
+      travel: r.phase_travel,
+      onsite: r.phase_onsite,
+      repair: r.phase_repair,
+      pause: r.phase_pause,
       sla_status: r.sla_status,
       status: r.status,
       priority: r.priority,
@@ -99,8 +116,30 @@ export function ReportsClient({ rows, options, filters }: Props) {
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "SLA Report");
-    const filename = `fetrack-sla-report-${new Date().toISOString().slice(0, 10)}.xlsx`;
-    XLSX.writeFile(wb, filename);
+    XLSX.writeFile(
+      wb,
+      `fetrack-sla-report-${new Date().toISOString().slice(0, 10)}.xlsx`
+    );
+  }
+
+  async function exportPdf() {
+    setPdfLoading(true);
+    try {
+      const report = await fetchCustomerSlaReportAction({
+        from: from || undefined,
+        to: to || undefined,
+        city: city !== "all" ? city : undefined,
+        engineer_id: engineerId !== "all" ? engineerId : undefined,
+        sla_tier: slaTier !== "all" ? slaTier : undefined,
+        tenant_id: tenantId !== "all" ? tenantId : undefined,
+      });
+      await downloadCustomerSlaPdf(report);
+      toast.success("PDF customer SLA diunduh");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Gagal generate PDF");
+    } finally {
+      setPdfLoading(false);
+    }
   }
 
   return (
@@ -112,11 +151,11 @@ export function ReportsClient({ rows, options, filters }: Props) {
             Filter laporan
           </CardTitle>
           <CardDescription>
-            Filter tanggal, kota, engineer, dan SLA tier. Export Excel untuk klien.
+            Filter lalu export Excel / PDF untuk PIC customer. Audit pause di menu terpisah.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
             <div className="space-y-1.5">
               <Label htmlFor="from">Dari tanggal</Label>
               <Input
@@ -129,6 +168,22 @@ export function ReportsClient({ rows, options, filters }: Props) {
             <div className="space-y-1.5">
               <Label htmlFor="to">Sampai tanggal</Label>
               <Input id="to" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Tenant</Label>
+              <Select value={tenantId} onValueChange={setTenantId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Semua tenant" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua tenant</SelectItem>
+                  {options.tenants.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.code} · {t.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1.5">
               <Label>Kota</Label>
@@ -188,6 +243,16 @@ export function ReportsClient({ rows, options, filters }: Props) {
               <Download className="mr-2 h-4 w-4" />
               Export Excel
             </Button>
+            <Button variant="outline" onClick={exportPdf} disabled={pdfLoading}>
+              <FileText className="mr-2 h-4 w-4" />
+              {pdfLoading ? "PDF…" : "PDF Customer"}
+            </Button>
+            <Button variant="secondary" asChild>
+              <Link href="/admin/reports/pause-audit">
+                <Timer className="mr-2 h-4 w-4" />
+                Pause Audit
+              </Link>
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -198,11 +263,20 @@ export function ReportsClient({ rows, options, filters }: Props) {
         <SummaryChip label="Breach" value={String(summary.breach)} tone="bad" />
       </div>
 
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <SummaryChip label="Avg Response" value={formatPhase(phaseSummary.response_avg_ms)} />
+        <SummaryChip label="Avg Travel" value={formatPhase(phaseSummary.travel_avg_ms)} />
+        <SummaryChip label="Avg On-site" value={formatPhase(phaseSummary.onsite_avg_ms)} />
+        <SummaryChip label="Avg Repair" value={formatPhase(phaseSummary.repair_avg_ms)} />
+        <SummaryChip label="Avg Pause" value={formatPhase(phaseSummary.pause_avg_ms)} />
+        <SummaryChip label="Avg Active" value={formatPhase(phaseSummary.active_avg_ms)} />
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle>Hasil laporan</CardTitle>
           <CardDescription>
-            Kolom: ticket_no, tenant, engineer, open_at, resolved_at, durasi, sla_status
+            Fase: response · travel · on-site · repair · pause
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -211,48 +285,52 @@ export function ReportsClient({ rows, options, filters }: Props) {
               Tidak ada data untuk filter ini.
             </p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Ticket</TableHead>
-                  <TableHead>Tenant</TableHead>
-                  <TableHead>Engineer</TableHead>
-                  <TableHead>Open</TableHead>
-                  <TableHead>Resolved</TableHead>
-                  <TableHead>Durasi</TableHead>
-                  <TableHead>SLA</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell>
-                      <Link
-                        href={`/admin/tickets/${r.id}`}
-                        className="font-medium text-sky-700 hover:underline"
-                      >
-                        {r.ticket_no}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <p className="max-w-[160px] truncate">{r.tenant}</p>
-                      <p className="text-xs text-muted-foreground">{r.city}</p>
-                    </TableCell>
-                    <TableCell>{r.engineer}</TableCell>
-                    <TableCell className="whitespace-nowrap text-xs">
-                      {formatDt(r.open_at)}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-xs">
-                      {r.resolved_at ? formatDt(r.resolved_at) : "—"}
-                    </TableCell>
-                    <TableCell>{r.duration}</TableCell>
-                    <TableCell>
-                      <SlaBadge status={r.sla_status} />
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Ticket</TableHead>
+                    <TableHead>Tenant</TableHead>
+                    <TableHead>Engineer</TableHead>
+                    <TableHead>Durasi</TableHead>
+                    <TableHead>Resp</TableHead>
+                    <TableHead>Travel</TableHead>
+                    <TableHead>Onsite</TableHead>
+                    <TableHead>Repair</TableHead>
+                    <TableHead>Pause</TableHead>
+                    <TableHead>SLA</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((r) => (
+                    <TableRow key={r.id}>
+                      <TableCell>
+                        <Link
+                          href={`/admin/tickets/${r.id}`}
+                          className="font-medium text-sky-700 hover:underline"
+                        >
+                          {r.ticket_no}
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        <p className="max-w-[140px] truncate">{r.tenant}</p>
+                        <p className="text-xs text-muted-foreground">{r.city}</p>
+                      </TableCell>
+                      <TableCell className="text-xs">{r.engineer}</TableCell>
+                      <TableCell className="text-xs">{r.duration}</TableCell>
+                      <TableCell className="font-mono text-[11px]">{r.phase_response}</TableCell>
+                      <TableCell className="font-mono text-[11px]">{r.phase_travel}</TableCell>
+                      <TableCell className="font-mono text-[11px]">{r.phase_onsite}</TableCell>
+                      <TableCell className="font-mono text-[11px]">{r.phase_repair}</TableCell>
+                      <TableCell className="font-mono text-[11px]">{r.phase_pause}</TableCell>
+                      <TableCell>
+                        <SlaBadge status={r.sla_status} />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

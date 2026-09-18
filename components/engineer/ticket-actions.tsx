@@ -16,6 +16,7 @@ import { updateTicketStatusAction } from "@/app/actions/tickets";
 import { updateEngineerLocation } from "@/app/actions/engineer-tickets";
 import { getDeviceChecklist } from "@/lib/utils/checklist";
 import { getCurrentPosition, useOfflineSync } from "@/hooks/use-offline-sync";
+import { compressImageFile } from "@/lib/utils/image-compress";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -39,7 +40,8 @@ export function EngineerTicketActions({
   acceptedAt = null,
 }: Props) {
   const router = useRouter();
-  const { online, enqueue, pendingCount } = useOfflineSync();
+  const { online, enqueue, pendingCount, conflictCount, storeOfflineBlob } =
+    useOfflineSync();
   const checklist = useMemo(() => getDeviceChecklist(deviceType), [deviceType]);
 
   const [loading, setLoading] = useState<string | null>(null);
@@ -55,6 +57,8 @@ export function EngineerTicketActions({
     exif_lat?: number | null;
     exif_lng?: number | null;
     exif_timestamp?: string | null;
+    before_blob_id?: string;
+    after_blob_id?: string;
   }>({});
   const [escalateReason, setEscalateReason] = useState("");
   const [sparepartId, setSparepartId] = useState("");
@@ -67,7 +71,12 @@ export function EngineerTicketActions({
     onlineFn: () => Promise<{ success: boolean; error?: string }>
   ) {
     if (!online) {
-      await enqueue({ type, payload, ticket_id: ticketId });
+      await enqueue({
+        type,
+        payload,
+        ticket_id: ticketId,
+        expected_from_status: status,
+      });
       setOk("Disimpan offline — menunggu sync");
       return { success: true, offline: true };
     }
@@ -128,7 +137,12 @@ export function EngineerTicketActions({
       const payload = { ticket_id: ticketId, lat, lng };
 
       if (!online) {
-        await enqueue({ type: "checkin", payload, ticket_id: ticketId });
+        await enqueue({
+          type: "checkin",
+          payload,
+          ticket_id: ticketId,
+          expected_from_status: status,
+        });
         setOk("Check-in disimpan offline — menunggu sync");
         return;
       }
@@ -182,8 +196,27 @@ export function EngineerTicketActions({
   }
 
   async function uploadPhoto(file: File, label: "before" | "after") {
+    // Compress dulu (online & offline)
+    const compressed = await compressImageFile(file);
+
+    if (!online) {
+      const blobId = await storeOfflineBlob(compressed.dataUrl, {
+        ticket_id: ticketId,
+        label,
+      });
+      // Preview lokal via data URL
+      if (label === "before") setBeforeUrl(compressed.dataUrl);
+      else setAfterUrl(compressed.dataUrl);
+      // Simpan blob id di meta sementara (dipakai resolve offline)
+      setPhotoMeta((m) => ({
+        ...m,
+        [`${label}_blob_id`]: blobId,
+      }));
+      return compressed.dataUrl;
+    }
+
     const form = new FormData();
-    form.append("file", file);
+    form.append("file", compressed.blob, `${label}.jpg`);
     form.append("ticketId", ticketId);
     form.append("label", label);
     const res = await fetch("/api/upload", { method: "POST", body: form });
@@ -191,7 +224,6 @@ export function EngineerTicketActions({
     if (!res.ok || !json.success) {
       throw new Error(json.error ?? "Upload gagal");
     }
-    // Simpan hash + EXIF dari foto before untuk anti-fraud di resolve
     if (label === "before") {
       setPhotoMeta({
         photo_hash: json.photo_hash ?? null,
@@ -221,21 +253,43 @@ export function EngineerTicketActions({
     setError(null);
     setOk(null);
 
-    const resolvePayload = {
+    const resolvePayload: Record<string, unknown> = {
       ticket_id: ticketId,
-      status: "RESOLVED" as const,
+      status: "RESOLVED",
       notes: `${notes.trim()} | Ping/LAN: OK`,
-      photo_url: [beforeUrl, afterUrl],
       photo_hash: photoMeta.photo_hash ?? undefined,
       exif_lat: photoMeta.exif_lat ?? undefined,
       exif_lng: photoMeta.exif_lng ?? undefined,
       exif_timestamp: photoMeta.exif_timestamp ?? undefined,
     };
 
+    if (
+      !online &&
+      photoMeta.before_blob_id &&
+      photoMeta.after_blob_id
+    ) {
+      resolvePayload.photo_blob_ids = [
+        photoMeta.before_blob_id,
+        photoMeta.after_blob_id,
+      ];
+    } else {
+      resolvePayload.photo_url = [beforeUrl, afterUrl];
+    }
+
     const result = await runOnlineOrQueue(
       "status_update",
       resolvePayload,
-      () => updateTicketStatusAction(resolvePayload)
+      () =>
+        updateTicketStatusAction({
+          ticket_id: ticketId,
+          status: "RESOLVED",
+          notes: `${notes.trim()} | Ping/LAN: OK`,
+          photo_url: [beforeUrl!, afterUrl!],
+          photo_hash: photoMeta.photo_hash ?? undefined,
+          exif_lat: photoMeta.exif_lat ?? undefined,
+          exif_lng: photoMeta.exif_lng ?? undefined,
+          exif_timestamp: photoMeta.exif_timestamp ?? undefined,
+        })
     );
 
     setLoading(null);
@@ -303,13 +357,18 @@ export function EngineerTicketActions({
     <div className="space-y-4">
       {!online && (
         <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-base font-medium text-amber-900">
-          Mode Offline — aksi disimpan dulu
-          {pendingCount > 0 ? ` · Menunggu Sync (${pendingCount})` : ""}
+          Mode Offline — aksi & foto disimpan lokal
+          {pendingCount > 0 ? ` · Queue (${pendingCount})` : ""}
         </div>
       )}
       {online && pendingCount > 0 && (
         <div className="rounded-xl border border-sky-300 bg-sky-50 px-4 py-3 text-base font-medium text-sky-900">
           Menunggu Sync: {pendingCount} aksi
+        </div>
+      )}
+      {conflictCount > 0 && (
+        <div className="rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-base font-medium text-rose-900">
+          {conflictCount} aksi conflict — buka badge sync untuk buang
         </div>
       )}
 

@@ -8,6 +8,10 @@ import { prisma } from "@/lib/prisma";
 import { generateTicketNo } from "@/lib/utils/ticket-generator";
 import { calculateSlaDueAt } from "@/lib/utils/sla";
 import type { CreateTicketInput } from "@/lib/validations/tickets";
+import {
+  findDuplicateOpenTicket,
+  mergeAlertIntoTicket,
+} from "@/lib/tickets/dedupe";
 
 export const ticketListInclude = {
   tenant: { select: { id: true, name: true, code: true, city: true, sla_tier: true } },
@@ -59,9 +63,11 @@ type CreateTicketParams = {
   changed_by?: string | null;
   source?: string | null;
   required_engineers?: number;
+  /** Skip dedupe — admin paksa ticket baru */
+  force_new?: boolean;
 };
 
-/** Buat ticket + log OPEN + hitung SLA */
+/** Buat ticket + log OPEN + hitung SLA. Alert duplikat → merge. */
 export async function createTicketRecord(params: CreateTicketParams) {
   const tenant = await prisma.tenant.findUnique({
     where: { id: params.tenant_id },
@@ -97,6 +103,25 @@ export async function createTicketRecord(params: CreateTicketParams) {
       if (!description || description.length < 10) {
         description = pkg.description || pkg.name;
       }
+    }
+  }
+
+  // Duplicate merge sebelum create
+  if (!params.force_new) {
+    const dup = await findDuplicateOpenTicket({
+      tenant_id: params.tenant_id,
+      device_id: params.device_id,
+    });
+    if (dup) {
+      const merged = await mergeAlertIntoTicket({
+        existing: dup,
+        description,
+        priority: params.priority,
+        reported_by: params.reported_by,
+        source: params.source,
+        changed_by: params.changed_by,
+      });
+      return Object.assign(merged, { merged: true as const });
     }
   }
 
@@ -161,7 +186,7 @@ export async function createTicketRecord(params: CreateTicketParams) {
     include: ticketListInclude,
   });
 
-  return refreshed ?? ticket;
+  return Object.assign(refreshed ?? ticket, { merged: false as const });
 }
 
 /** Resolve tenant/device dari body API (manual atau webhook) */

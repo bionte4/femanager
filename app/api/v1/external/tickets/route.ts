@@ -92,19 +92,42 @@ export async function POST(req: NextRequest) {
       priority,
       description: input.description,
       reported_by: input.reported_by ?? integration.customer_name,
+      source: "EXTERNAL",
     });
 
-    await prisma.externalTicket.create({
-      data: {
-        integration_id: integration.id,
-        external_ticket_id: input.external_ticket_id,
-        internal_ticket_id: ticket.id,
-        last_payload: input as object,
+    const merged = "merged" in ticket && ticket.merged === true;
+
+    // Link external ID — skip create baru jika sudah ada row untuk internal (merge)
+    const existingLink = await prisma.externalTicket.findFirst({
+      where: {
+        OR: [
+          {
+            integration_id: integration.id,
+            external_ticket_id: input.external_ticket_id,
+          },
+          { internal_ticket_id: ticket.id, integration_id: integration.id },
+        ],
       },
     });
 
+    if (!existingLink) {
+      await prisma.externalTicket.create({
+        data: {
+          integration_id: integration.id,
+          external_ticket_id: input.external_ticket_id,
+          internal_ticket_id: ticket.id,
+          last_payload: input as object,
+        },
+      });
+    } else {
+      await prisma.externalTicket.update({
+        where: { id: existingLink.id },
+        data: { last_payload: input as object },
+      });
+    }
+
     // Jika sudah ASSIGNED dari auto-dispatch, push webhook
-    if (ticket.status === "ASSIGNED") {
+    if (!merged && ticket.status === "ASSIGNED") {
       const { triggerExternalWebhook } = await import("@/lib/webhook");
       void triggerExternalWebhook(ticket.id, ticket.status);
     }
@@ -116,6 +139,7 @@ export async function POST(req: NextRequest) {
         internal_ticket_id: ticket.id,
         sla_due_at: ticket.sla_due_at,
         status: ticket.status,
+        merged,
         assigned_engineer: ticket.assigned_engineer
           ? {
               name: ticket.assigned_engineer.full_name,

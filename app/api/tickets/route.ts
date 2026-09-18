@@ -62,9 +62,10 @@ export async function POST(req: NextRequest) {
           dispatch_attempts: ticket.dispatch_attempts,
           tenant: ticket.tenant,
           device: ticket.device,
+          merged: "merged" in ticket ? ticket.merged === true : false,
         },
       },
-      { status: 201 }
+      { status: "merged" in ticket && ticket.merged ? 200 : 201 }
     );
   } catch (e) {
     return NextResponse.json(

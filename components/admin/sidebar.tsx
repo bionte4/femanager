@@ -21,6 +21,7 @@ import {
   Layers,
   Scale,
   GitBranch,
+  Radio,
   LogOut,
   Menu,
   X,
@@ -49,6 +50,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Operasi",
     items: [
       { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/admin/war-room", label: "War Room", icon: Radio },
       { href: "/admin/map", label: "Peta", icon: Map },
       { href: "/admin/routing", label: "Routing", icon: GitBranch },
       { href: "/admin/tickets", label: "Tickets", icon: Ticket },
@@ -85,6 +87,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Sistem",
     items: [
       { href: "/admin/integrations", label: "Integrations", icon: Plug },
+      { href: "/admin/integrations/dlq", label: "Webhook DLQ", icon: Plug },
       { href: "/admin/settings", label: "Settings", icon: Settings },
     ],
   },

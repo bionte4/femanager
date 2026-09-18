@@ -11,6 +11,10 @@ import {
   updateTicketStatusAction,
 } from "@/app/actions/tickets";
 import { escalateToL1Action } from "@/app/actions/routing";
+import {
+  HandoverEscalateDialog,
+  type HandoverFormValue,
+} from "@/components/ticket/handover-form";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -47,6 +51,7 @@ const STATUS_FLOW: TicketStatus[] = [
 
 export function TicketActionsPanel({
   ticketId,
+  ticketNo,
   currentStatus,
   assignedEngineerId,
   engineers,
@@ -55,6 +60,7 @@ export function TicketActionsPanel({
   canEscalateL0,
 }: {
   ticketId: string;
+  ticketNo?: string;
   currentStatus: TicketStatus;
   assignedEngineerId: string | null;
   engineers: EngineerOption[];
@@ -67,6 +73,7 @@ export function TicketActionsPanel({
   const [status, setStatus] = useState<TicketStatus>(currentStatus);
   const [notes, setNotes] = useState("");
   const [stopReason, setStopReason] = useState("");
+  const [handoverOpen, setHandoverOpen] = useState(false);
   const [loading, setLoading] = useState<
     "assign" | "status" | "pause" | "resume" | "escalate" | null
   >(null);
@@ -152,174 +159,186 @@ export function TicketActionsPanel({
     router.refresh();
   }
 
-  async function handleEscalate() {
+  async function handleEscalate(handover: HandoverFormValue) {
     setLoading("escalate");
     setError(null);
     setOk(null);
     const result = await escalateToL1Action({
       ticket_id: ticketId,
-      reason: notes || null,
+      handover: {
+        symptoms: handover.symptoms,
+        last_ping: handover.last_ping,
+        remote_actions: handover.remote_actions,
+        notes: handover.notes || null,
+      },
     });
     setLoading(null);
     if (!result.success) {
       setError(result.error);
       return;
     }
+    setHandoverOpen(false);
     setOk("Ticket di-escalate ke antrian L1");
     setStatus("PENDING_L1");
     router.refresh();
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Aksi</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-5">
-        <div className="space-y-2 rounded-md border border-dashed p-3">
-          <div className="flex items-center justify-between gap-2">
-            <Label className="text-sm">Stop Clock SLA</Label>
-            {isPaused && (
-              <span className="text-[10px] font-medium uppercase tracking-wide text-slate-600">
-                Paused
-              </span>
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Aksi</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="space-y-2 rounded-md border border-dashed p-3">
+            <div className="flex items-center justify-between gap-2">
+              <Label className="text-sm">Stop Clock SLA</Label>
+              {isPaused && (
+                <span className="text-[10px] font-medium uppercase tracking-wide text-slate-600">
+                  Paused
+                </span>
+              )}
+            </div>
+            {isPaused ? (
+              <>
+                {stopClockReason && (
+                  <p className="text-xs text-muted-foreground">{stopClockReason}</p>
+                )}
+                <Button
+                  variant="secondary"
+                  onClick={handleResume}
+                  disabled={loading === "resume"}
+                  className="w-full"
+                >
+                  {loading === "resume" ? (
+                    <Loader2 className="animate-spin" />
+                  ) : (
+                    <Play className="h-4 w-4" />
+                  )}
+                  Resume Clock
+                </Button>
+              </>
+            ) : (
+              <>
+                <textarea
+                  className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  placeholder="Alasan pause (wajib, min 5 karakter)"
+                  value={stopReason}
+                  onChange={(e) => setStopReason(e.target.value)}
+                />
+                <Button
+                  variant="outline"
+                  onClick={handlePause}
+                  disabled={loading === "pause"}
+                  className="w-full"
+                >
+                  {loading === "pause" ? (
+                    <Loader2 className="animate-spin" />
+                  ) : (
+                    <Pause className="h-4 w-4" />
+                  )}
+                  Stop Clock
+                </Button>
+              </>
             )}
           </div>
-          {isPaused ? (
-            <>
-              {stopClockReason && (
-                <p className="text-xs text-muted-foreground">{stopClockReason}</p>
-              )}
-              <Button
-                variant="secondary"
-                onClick={handleResume}
-                disabled={loading === "resume"}
-                className="w-full"
-              >
-                {loading === "resume" ? (
-                  <Loader2 className="animate-spin" />
-                ) : (
-                  <Play className="h-4 w-4" />
-                )}
-                Resume Clock
-              </Button>
-            </>
-          ) : (
-            <>
-              <textarea
-                className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                placeholder="Alasan pause (wajib, min 5 karakter) — mis. tunggu sparepart vendor"
-                value={stopReason}
-                onChange={(e) => setStopReason(e.target.value)}
-              />
-              <Button
-                variant="outline"
-                onClick={handlePause}
-                disabled={loading === "pause"}
-                className="w-full"
-              >
-                {loading === "pause" ? (
-                  <Loader2 className="animate-spin" />
-                ) : (
-                  <Pause className="h-4 w-4" />
-                )}
-                Stop Clock
-              </Button>
-            </>
-          )}
-        </div>
 
-        {canEscalateL0 &&
-          currentStatus !== "PENDING_L1" &&
-          currentStatus !== "RESOLVED" &&
-          currentStatus !== "CLOSED" && (
-            <div className="space-y-2 border-t pt-4">
-              <Label>Eskalasi L0 → L1</Label>
-              <p className="text-xs text-muted-foreground">
-                Kirim ke antrian L1 untuk pengecekan device & assign FE.
-              </p>
-              <Button
-                variant="destructive"
-                onClick={handleEscalate}
-                disabled={loading === "escalate"}
-                className="w-full"
-              >
-                {loading === "escalate" ? (
-                  <Loader2 className="animate-spin" />
-                ) : (
+          {canEscalateL0 &&
+            currentStatus !== "PENDING_L1" &&
+            currentStatus !== "RESOLVED" &&
+            currentStatus !== "CLOSED" && (
+              <div className="space-y-2 border-t pt-4">
+                <Label>Eskalasi L0 → L1</Label>
+                <p className="text-xs text-muted-foreground">
+                  Wajib isi handover (gejala, last ping, aksi remote).
+                </p>
+                <Button
+                  variant="destructive"
+                  onClick={() => setHandoverOpen(true)}
+                  className="w-full"
+                >
                   <ArrowUpRight className="h-4 w-4" />
-                )}
-                Escalate ke L1
-              </Button>
-            </div>
+                  Escalate ke L1
+                </Button>
+              </div>
+            )}
+
+          <div className="space-y-2 border-t pt-4">
+            <Label>Assign Engineer (manual)</Label>
+            <Select value={engineerId || undefined} onValueChange={setEngineerId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Pilih engineer" />
+              </SelectTrigger>
+              <SelectContent>
+                {engineers.map((e) => (
+                  <SelectItem key={e.id} value={e.id}>
+                    {e.full_name} · {e.status}
+                    {e.city ? ` · ${e.city}` : ""}
+                    {e.skills?.length ? ` · ${e.skills.join("/")}` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              onClick={handleAssign}
+              disabled={loading === "assign"}
+              className="w-full"
+            >
+              {loading === "assign" && <Loader2 className="animate-spin" />}
+              Assign Engineer
+            </Button>
+          </div>
+
+          <div className="space-y-2 border-t pt-4">
+            <Label>Update Status</Label>
+            <Select
+              value={status}
+              onValueChange={(v) => setStatus(v as TicketStatus)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {STATUS_FLOW.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {s}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <textarea
+              className="flex min-h-[70px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              placeholder="Notes (opsional)"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+            <Button
+              variant="secondary"
+              onClick={handleStatus}
+              disabled={loading === "status"}
+              className="w-full"
+            >
+              {loading === "status" && <Loader2 className="animate-spin" />}
+              Simpan Status + Log
+            </Button>
+          </div>
+
+          {error && (
+            <p className="text-sm text-destructive" role="alert">
+              {error}
+            </p>
           )}
+          {ok && <p className="text-sm text-emerald-700">{ok}</p>}
+        </CardContent>
+      </Card>
 
-        <div className="space-y-2 border-t pt-4">
-          <Label>Assign Engineer (manual)</Label>
-          <Select value={engineerId || undefined} onValueChange={setEngineerId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Pilih engineer" />
-            </SelectTrigger>
-            <SelectContent>
-              {engineers.map((e) => (
-                <SelectItem key={e.id} value={e.id}>
-                  {e.full_name} · {e.status}
-                  {e.city ? ` · ${e.city}` : ""}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            onClick={handleAssign}
-            disabled={loading === "assign"}
-            className="w-full"
-          >
-            {loading === "assign" && <Loader2 className="animate-spin" />}
-            Assign Engineer
-          </Button>
-        </div>
-
-        <div className="space-y-2 border-t pt-4">
-          <Label>Update Status</Label>
-          <Select
-            value={status}
-            onValueChange={(v) => setStatus(v as TicketStatus)}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {STATUS_FLOW.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {s}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <textarea
-            className="flex min-h-[70px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            placeholder="Notes (opsional)"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-          />
-          <Button
-            variant="secondary"
-            onClick={handleStatus}
-            disabled={loading === "status"}
-            className="w-full"
-          >
-            {loading === "status" && <Loader2 className="animate-spin" />}
-            Simpan Status + Log
-          </Button>
-        </div>
-
-        {error && (
-          <p className="text-sm text-destructive" role="alert">
-            {error}
-          </p>
-        )}
-        {ok && <p className="text-sm text-emerald-700">{ok}</p>}
-      </CardContent>
-    </Card>
+      <HandoverEscalateDialog
+        open={handoverOpen}
+        onOpenChange={setHandoverOpen}
+        ticketNo={ticketNo}
+        loading={loading === "escalate"}
+        onSubmit={handleEscalate}
+      />
+    </>
   );
 }

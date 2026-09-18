@@ -58,9 +58,10 @@ export async function POST(req: NextRequest) {
           sla_due_at: ticket.sla_due_at,
           assigned_engineer: ticket.assigned_engineer,
           dispatch_attempts: ticket.dispatch_attempts,
+          merged: "merged" in ticket ? ticket.merged === true : false,
         },
       },
-      { status: 201 }
+      { status: "merged" in ticket && ticket.merged ? 200 : 201 }
     );
   } catch (e) {
     return NextResponse.json(

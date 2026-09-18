@@ -11,6 +11,14 @@ import {
   buildReassignMessage,
   sendWhatsApp,
 } from "@/lib/whatsapp";
+import {
+  categoryCodeForDeviceType,
+  engineerHasSkill,
+  getActiveCertifiedEngineerIds,
+  skillAliasesForCategory,
+} from "@/lib/skill-match";
+
+export { categoryCodeForDeviceType } from "@/lib/skill-match";
 
 export type NearbyEngineer = {
   id: string;
@@ -22,18 +30,6 @@ export type NearbyEngineer = {
   trust_score: number;
   distance_meters: number;
 };
-
-/** Legacy map device type → category code */
-export function categoryCodeForDeviceType(
-  type: DeviceType | null | undefined
-): string | null {
-  if (!type) return null;
-  if (type === DeviceType.EDC_BCA || type === DeviceType.EDC_BRI) return "EDC";
-  if (type === DeviceType.ROUTER_SDWAN) return "SDWAN";
-  if (type === DeviceType.ROUTER) return "WIFI";
-  if (type === DeviceType.SWITCH) return "WIFI";
-  return null;
-}
 
 /** @deprecated gunakan categoryCodeForDeviceType */
 export function skillForDeviceType(type: DeviceType | null | undefined): string | null {
@@ -88,9 +84,6 @@ export async function findNearbyEngineers(
       lat: { not: null },
       lng: { not: null },
       id: excludeIds.length ? { notIn: excludeIds } : undefined,
-      ...(params.categoryCode
-        ? { skills: { has: params.categoryCode } }
-        : {}),
     },
     select: {
       id: true,
@@ -105,19 +98,21 @@ export async function findNearbyEngineers(
     },
   });
 
-  let list = engineers;
+  // Filter skill ketat (termasuk alias EDC/LAN/WAN ↔ category code)
+  let list = params.categoryCode
+    ? engineers.filter((e) => engineerHasSkill(e.skills, params.categoryCode))
+    : engineers;
 
   if (params.requiresCertification && params.categoryCode) {
-    const certified = await prisma.skillCertification.findMany({
-      where: {
-        engineer_id: { in: list.map((e) => e.id) },
-        skill: params.categoryCode,
-        is_active: true,
-      },
-      select: { engineer_id: true },
+    const certified = await getActiveCertifiedEngineerIds({
+      engineerIds: list.map((e) => e.id),
+      categoryCode: params.categoryCode,
     });
-    const set = new Set(certified.map((c) => c.engineer_id));
-    list = list.filter((e) => set.has(e.id));
+    list = list.filter((e) => certified.has(e.id));
+
+    if (params.categoryCode.toUpperCase() === "SDWAN") {
+      list = list.filter((e) => e.trust_score > 85);
+    }
   }
 
   // Prioritas motor+toolkit untuk CCTV/WIFI/LAPTOP
@@ -154,28 +149,25 @@ export async function findNearbyEngineers(
   }));
 }
 
-/** Filter SDWAN legacy (cert + trust + experience) */
+/** Filter SDWAN legacy (cert aktif + trust + alias skill) */
 export async function filterSdwanEligibleEngineers(
   engineerIds: string[]
 ): Promise<string[]> {
   if (engineerIds.length === 0) return [];
-  const certified = await prisma.skillCertification.findMany({
-    where: {
-      engineer_id: { in: engineerIds },
-      skill: { in: ["SDWAN", "WAN"] },
-      is_active: true,
-    },
-    select: { engineer_id: true },
+  const certified = await getActiveCertifiedEngineerIds({
+    engineerIds,
+    categoryCode: "SDWAN",
   });
-  const certSet = new Set(certified.map((c) => c.engineer_id));
   const users = await prisma.user.findMany({
     where: {
-      id: { in: engineerIds.filter((id) => certSet.has(id)) },
+      id: { in: engineerIds.filter((id) => certified.has(id)) },
       trust_score: { gt: 85 },
     },
-    select: { id: true },
+    select: { id: true, skills: true },
   });
-  return users.map((u) => u.id);
+  return users
+    .filter((u) => engineerHasSkill(u.skills, "SDWAN"))
+    .map((u) => u.id);
 }
 
 export type DispatchResult = {
@@ -267,6 +259,9 @@ export async function autoDispatchTicket(
   });
 
   if (nearby.length === 0) {
+    const aliasHint = categoryCode
+      ? ` skill ∈ [${skillAliasesForCategory(categoryCode).join(", ")}]`
+      : "";
     await prisma.$transaction(async (tx) => {
       await tx.ticket.update({
         where: { id: ticket.id },
@@ -278,7 +273,7 @@ export async function autoDispatchTicket(
           status_from: ticket.status,
           status_to: TicketStatus.ESCALATED,
           notes: categoryCode
-            ? `Auto-dispatch gagal: tidak ada FE skill ${categoryCode}${requiresCert ? " + sertifikasi" : ""} di dekat lokasi`
+            ? `Auto-dispatch gagal: tidak ada FE${aliasHint}${requiresCert ? " + sertifikasi aktif" : ""} di dekat lokasi`
             : "Auto-dispatch gagal: tidak ada engineer AVAILABLE di dekat lokasi",
           photo_url: [],
         },
@@ -343,7 +338,7 @@ export async function autoDispatchTicket(
         status_to: TicketStatus.ASSIGNED,
         notes: isReassign
           ? `Auto re-assign #${attempt} ke ${engineer.full_name} (${Math.round(engineer.distance_meters)}m)`
-          : `Auto-dispatch ke ${engineer.full_name} (${Math.round(engineer.distance_meters)}m)${categoryCode ? ` · ${categoryCode}` : ""}${requiredEngineers > 1 ? ` · butuh ${requiredEngineers} FE` : ""}`,
+          : `Auto-dispatch ke ${engineer.full_name} (${Math.round(engineer.distance_meters)}m)${categoryCode ? ` · ${categoryCode}` : ""}${requiresCert ? " · cert OK" : ""}${requiredEngineers > 1 ? ` · butuh ${requiredEngineers} FE` : ""}`,
         photo_url: [],
       },
     });

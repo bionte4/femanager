@@ -1,11 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { Role, TicketStatus } from "@prisma/client";
+import { Prisma, TicketStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { auth, ADMIN_ROLES, NOC_L0_ROLES, NOC_L1_ROLES } from "@/lib/auth";
 import { notifyEscalateL1 } from "@/lib/notifications";
 import { ticketListInclude } from "@/lib/tickets/service";
+import {
+  formatHandoverLog,
+  l1HandoverSchema,
+  type L1HandoverInput,
+  type L1HandoverPayload,
+} from "@/lib/validations/handover";
 
 type ActionResult<T = undefined> =
   | { success: true; data?: T }
@@ -58,14 +64,25 @@ export async function getL1RoutingQueue() {
   });
 }
 
+/**
+ * Eskalasi L0 → L1 wajib isi handover: gejala, last ping, aksi remote.
+ */
 export async function escalateToL1Action(input: {
   ticket_id: string;
-  reason?: string | null;
+  handover: L1HandoverInput;
 }): Promise<ActionResult> {
   try {
     const session = await requireAdmin();
     if (!canL0(session.user.role)) {
       return { success: false, error: "Hanya L0 / dispatcher yang boleh escalate ke L1" };
+    }
+
+    const parsed = l1HandoverSchema.safeParse(input.handover);
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: parsed.error.issues[0]?.message ?? "Handover tidak lengkap",
+      };
     }
 
     const ticket = await prisma.ticket.findUnique({
@@ -85,9 +102,15 @@ export async function escalateToL1Action(input: {
     }
 
     const now = new Date();
-    const reason =
-      input.reason?.trim() ||
-      "Eskalasi L0 → L1: butuh pengecekan device & assign FE";
+    const handoverPayload: L1HandoverPayload = {
+      symptoms: parsed.data.symptoms.trim(),
+      last_ping: parsed.data.last_ping.trim(),
+      remote_actions: parsed.data.remote_actions,
+      notes: parsed.data.notes?.trim() || null,
+      handed_over_at: now.toISOString(),
+      handed_over_by: session.user.id,
+    };
+    const logNotes = formatHandoverLog(parsed.data);
 
     await prisma.$transaction(async (tx) => {
       await tx.ticket.update({
@@ -96,6 +119,7 @@ export async function escalateToL1Action(input: {
           status: TicketStatus.PENDING_L1,
           escalated_to_l1_at: now,
           escalated_by_id: session.user.id,
+          l1_handover: handoverPayload as unknown as Prisma.InputJsonValue,
         },
       });
 
@@ -105,7 +129,7 @@ export async function escalateToL1Action(input: {
           status_from: ticket.status,
           status_to: TicketStatus.PENDING_L1,
           changed_by: session.user.id,
-          notes: reason,
+          notes: logNotes,
           photo_url: [],
         },
       });
@@ -114,7 +138,7 @@ export async function escalateToL1Action(input: {
     void notifyEscalateL1({
       id: ticket.id,
       ticket_no: ticket.ticket_no,
-      reason,
+      reason: `Gejala: ${handoverPayload.symptoms.slice(0, 80)}`,
     });
 
     revalidatePath("/admin/routing");
