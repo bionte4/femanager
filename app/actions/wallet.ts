@@ -7,7 +7,9 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { formatRupiah } from "@/lib/utils/rupiah";
 import { BANKS, MIN_WITHDRAWAL } from "@/lib/wallet-constants";
-import { isMitraEngagement } from "@/lib/eligibility";
+import { isMitraEngagement, isPkwtEngagement } from "@/lib/eligibility";
+
+const RESIDUAL_NOTE_PREFIX = "[RESIDUAL_MITRA]";
 
 async function requireEngineer() {
   const session = await auth();
@@ -205,4 +207,91 @@ export async function getMyWithdrawals() {
     notes: w.notes,
     amount_label: formatRupiah(w.amount),
   }));
+}
+
+const residualPayoutSchema = z.object({
+  amount: z.coerce.number().int().positive(),
+  bank_name: z.enum(BANKS),
+  bank_account_no: z.string().min(5).max(30),
+  bank_account_name: z.string().min(3).max(100),
+});
+
+/**
+ * Engineer PKWT: ajukan pencairan sisa saldo masa Mitra (boleh di bawah MIN_WITHDRAWAL).
+ */
+export async function requestResidualPayout(
+  input: z.infer<typeof residualPayoutSchema>
+): Promise<ActionResult<{ id: string }>> {
+  try {
+    const session = await requireEngineer();
+
+    const eng = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { engagement_type: true, phone: true },
+    });
+    if (!eng || !isPkwtEngagement(eng.engagement_type)) {
+      return {
+        success: false,
+        error: "Pencairan residual hanya untuk akun PKWT dengan sisa saldo Mitra",
+      };
+    }
+
+    const data = residualPayoutSchema.parse(input);
+
+    const wallet = await prisma.engineerWallet.findUnique({
+      where: { engineer_id: session.user.id },
+    });
+    if (!wallet || wallet.balance <= 0) {
+      return { success: false, error: "Tidak ada sisa saldo" };
+    }
+    if (data.amount > wallet.balance) {
+      return { success: false, error: "Saldo tidak mencukupi" };
+    }
+
+    const pending = await prisma.withdrawal.findFirst({
+      where: {
+        engineer_id: session.user.id,
+        status: { in: [WithdrawalStatus.PENDING, WithdrawalStatus.APPROVED] },
+      },
+    });
+    if (pending) {
+      return {
+        success: false,
+        error: "Masih ada permintaan penarikan yang belum selesai",
+      };
+    }
+
+    const created = await prisma.withdrawal.create({
+      data: {
+        engineer_id: session.user.id,
+        amount: data.amount,
+        bank_name: data.bank_name,
+        bank_account_no: data.bank_account_no,
+        bank_account_name: data.bank_account_name,
+        status: WithdrawalStatus.PENDING,
+        notes: `${RESIDUAL_NOTE_PREFIX} Diajukan engineer — sisa saldo masa Mitra`,
+      },
+    });
+
+    revalidatePath("/engineer/wallet");
+    revalidatePath("/admin/payroll");
+    return { success: true, data: { id: created.id } };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Gagal ajukan pencairan residual",
+    };
+  }
+}
+
+export async function getMyResidualWithdrawal() {
+  const session = await requireEngineer();
+  return prisma.withdrawal.findFirst({
+    where: {
+      engineer_id: session.user.id,
+      notes: { startsWith: RESIDUAL_NOTE_PREFIX },
+      status: { in: [WithdrawalStatus.PENDING, WithdrawalStatus.APPROVED] },
+    },
+    orderBy: { requested_at: "desc" },
+  });
 }

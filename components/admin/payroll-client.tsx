@@ -9,9 +9,12 @@ import {
   markWithdrawalPaid,
   rejectWithdrawal,
   getPayrollReport,
+  getResidualPayoutReport,
+  createResidualWithdrawalAction,
 } from "@/app/actions/payroll";
 import { formatRupiah } from "@/lib/utils/rupiah";
 import { formatMttr } from "@/lib/sla";
+import { BANKS } from "@/lib/wallet-constants";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +31,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 
 type Kpis = {
   total_balance: number;
+  residual_pkwt_balance?: number;
+  residual_pkwt_count?: number;
   month_commission: number;
   pending_withdrawal_amount: number;
   pending_withdrawal_count: number;
@@ -40,6 +45,7 @@ type WalletRow = {
   phone: string;
   city: string | null;
   engagement_type?: string;
+  is_residual?: boolean;
   balance: number;
   total_earned: number;
   total_penalty: number;
@@ -72,6 +78,7 @@ type WdRow = {
   engineer_phone: string;
   engineer_id: string;
   notes: string | null;
+  is_residual?: boolean;
 };
 
 const TABS = ["wallets", "transactions", "withdrawals", "report"] as const;
@@ -133,10 +140,14 @@ export function PayrollClient({
   async function exportReport() {
     startTransition(async () => {
       const XLSX = await import("xlsx");
-      const rows = await getPayrollReport(month);
+      const [rows, residual] = await Promise.all([
+        getPayrollReport(month),
+        getResidualPayoutReport(),
+      ]);
       const data = rows.map((r) => ({
         engineer_name: r.engineer_name,
         phone: r.phone,
+        engagement: r.engagement_type ?? "MITRA",
         jumlah_ticket_closed: r.jumlah_ticket_closed,
         total_fee: r.total_fee,
         total_bonus: r.total_bonus,
@@ -145,20 +156,58 @@ export function PayrollClient({
         MTTR: formatMttr(r.mttr_minutes),
         sla_meet_rate: r.sla_meet_rate,
       }));
+      const residualData = residual.map((r) => ({
+        engineer_name: r.engineer_name,
+        phone: r.phone,
+        engagement: r.engagement_type,
+        residual_balance: r.residual_balance,
+      }));
       const ws = XLSX.utils.json_to_sheet(data);
+      const ws2 = XLSX.utils.json_to_sheet(residualData);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Payroll");
+      XLSX.utils.book_append_sheet(wb, ws, "Payroll Mitra");
+      XLSX.utils.book_append_sheet(wb, ws2, "Residual PKWT");
       XLSX.writeFile(wb, `fetrack-payroll-${month}.xlsx`);
-      toast.success("Excel diexport");
+      toast.success("Excel diexport (Mitra + Residual PKWT)");
     });
+  }
+
+  async function handleResidual(engineerId: string, balance: number) {
+    const bank = prompt(`Bank (${BANKS.join("/")})`, BANKS[0]);
+    if (!bank || !(BANKS as readonly string[]).includes(bank)) {
+      return toast.error("Bank tidak valid");
+    }
+    const accountNo = prompt("No. rekening");
+    if (!accountNo || accountNo.length < 5) return toast.error("No. rekening wajib");
+    const accountName = prompt("Nama rekening");
+    if (!accountName || accountName.length < 3) return toast.error("Nama rekening wajib");
+
+    setBusy(engineerId);
+    const r = await createResidualWithdrawalAction({
+      engineer_id: engineerId,
+      bank_name: bank as (typeof BANKS)[number],
+      bank_account_no: accountNo,
+      bank_account_name: accountName,
+      amount: balance,
+    });
+    setBusy(null);
+    if (!r.success) return toast.error(r.error);
+    toast.success("Residual withdrawal dibuat — approve di tab Withdrawal");
+    router.refresh();
   }
 
   return (
     <div className="space-y-3">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi title="Total Saldo Engineer" value={formatRupiah(kpis.total_balance)} />
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <Kpi title="Saldo Mitra" value={formatRupiah(kpis.total_balance)} />
         <Kpi
-          title="Komisi Bulan Ini"
+          title="Sisa Residual PKWT"
+          value={formatRupiah(kpis.residual_pkwt_balance ?? 0)}
+          hint={`${kpis.residual_pkwt_count ?? 0} engineer`}
+          tone="warn"
+        />
+        <Kpi
+          title="Komisi Bulan Ini (Mitra)"
           value={formatRupiah(kpis.month_commission)}
           tone="ok"
         />
@@ -169,7 +218,7 @@ export function PayrollClient({
           tone="warn"
         />
         <Kpi
-          title="Denda Bulan Ini"
+          title="Denda Bulan Ini (Mitra)"
           value={formatRupiah(kpis.month_penalty)}
           tone="bad"
         />
@@ -207,6 +256,7 @@ export function PayrollClient({
                   <TableHead>Withdrawn</TableHead>
                   <TableHead>Ticket bln ini</TableHead>
                   <TableHead>MTTR</TableHead>
+                  <TableHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -221,7 +271,7 @@ export function PayrollClient({
                       </Link>
                       <div className="mt-0.5 flex flex-wrap items-center gap-1">
                         <p className="text-xs text-muted-foreground">{w.city}</p>
-                        {w.engagement_type && w.engagement_type !== "MITRA" && (
+                        {w.is_residual && (
                           <Badge variant="secondary" className="text-[10px]">
                             {w.engagement_type === "PKWT_INTERNAL"
                               ? "PKWT Internal"
@@ -241,6 +291,18 @@ export function PayrollClient({
                     <TableCell>{formatRupiah(w.total_withdrawn)}</TableCell>
                     <TableCell>{w.tickets_month}</TableCell>
                     <TableCell className="text-xs">{formatMttr(w.mttr_minutes)}</TableCell>
+                    <TableCell>
+                      {w.is_residual && w.balance > 0 && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={busy === w.id}
+                          onClick={() => void handleResidual(w.id, w.balance)}
+                        >
+                          Cairkan sisa
+                        </Button>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -327,6 +389,11 @@ export function PayrollClient({
                       <TableCell>
                         <p className="font-medium">{w.engineer_name}</p>
                         <p className="text-xs text-muted-foreground">{w.engineer_phone}</p>
+                        {w.is_residual && (
+                          <Badge variant="secondary" className="mt-1 text-[10px]">
+                            Residual Mitra
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell className="font-semibold">
                         {formatRupiah(w.amount)}
@@ -401,8 +468,12 @@ export function PayrollClient({
               />
             </div>
             <Button onClick={exportReport} disabled={pending}>
-              {pending ? "Exporting..." : "Export Excel"}
+              {pending ? "Exporting..." : "Export Excel (Mitra + Residual)"}
             </Button>
+            <p className="w-full text-xs text-muted-foreground">
+              Sheet 1: fee Mitra bulan dipilih. Sheet 2: sisa saldo PKWT belum
+              dicairkan.
+            </p>
           </CardContent>
         </Card>
       )}

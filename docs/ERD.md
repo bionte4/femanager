@@ -15,6 +15,8 @@ erDiagram
   User ||--o{ EngineerWallet : has
   User ||--o{ EngineerAgreement : signs
   User ||--o{ ComplianceLog : logs
+  User ||--o{ EngineerContract : "PKWT contracts"
+  User ||--o{ EngagementChangeLog : "engagement flips"
 
   Tenant ||--o{ Device : owns
   Tenant ||--o{ Ticket : opens
@@ -49,6 +51,27 @@ erDiagram
     float lng
     string status
     string partnership_status
+    string engagement_type
+    string employment_status
+  }
+
+  EngineerContract {
+    string id PK
+    string user_id FK
+    string type
+    string status
+    datetime start_at
+    datetime end_at
+    string[] placement_cities
+    string[] placement_tenant_ids
+  }
+
+  EngagementChangeLog {
+    string id PK
+    string user_id FK
+    string from_type
+    string to_type
+    string reason
   }
 
   Tenant {
@@ -107,13 +130,15 @@ erDiagram
 
 ## 2. Domain groups
 
-### 2.1 Identity & mitra
+### 2.1 Identity & engagement
 | Model | Keterangan |
 |-------|------------|
-| `User` | Admin, NOC L0/L1, Dispatcher, Field Engineer |
+| `User` | Admin, NOC L0/L1, Dispatcher, Field Engineer; `engagement_type`, `employment_status` |
 | `SkillCertification` | Sertifikasi skill (aktif + expiry) |
-| `PartnershipAgreement` | Template perjanjian versi |
-| `EngineerAgreement` | Tanda tangan per engineer |
+| `PartnershipAgreement` | Template perjanjian kemitraan (Mitra) |
+| `EngineerAgreement` | Tanda tangan per engineer Mitra |
+| `EngineerContract` | Kontrak PKWT (placement kota/tenant, masa berlaku) |
+| `EngagementChangeLog` | Audit flip MITRA ↔ PKWT |
 | `ComplianceLog` | Audit compliance (timeout, reject, dll.) |
 
 ### 2.2 Asset & lokasi
@@ -142,9 +167,9 @@ erDiagram
 ### 2.5 Komisi, fraud, talent
 | Model | Keterangan |
 |-------|------------|
-| `CommissionRule`, `EngineerWallet`, `WalletTransaction`, `Withdrawal` | Fee & payout |
-| `EngineerRating`, `FraudLog` | Anti-fraud & rating |
-| `LeaderboardSnapshot` | Ranking periodik |
+| `CommissionRule`, `EngineerWallet`, `WalletTransaction`, `Withdrawal` | Fee & payout **Mitra only** (PKWT → payroll HR) |
+| `EngineerRating`, `FraudLog` | Anti-fraud & rating (hold komisi hanya Mitra) |
+| `LeaderboardSnapshot` | Ranking periodik (query MITRA) |
 | `EngineerCandidate` | Pipeline recruitment |
 | `KnowledgeBase` | SOP / artikel |
 
@@ -165,9 +190,10 @@ Field SLA khusus pada `Ticket`:
 - `l1_handover` — JSON handover L0→L1
 - `escalated_to_l1_at` / `escalated_by_id`
 
-Model tambahan Sprint D:
+Model tambahan Sprint D + Engagement:
 - `PushDeviceToken` — FCM token per user
 - `SparepartMutation` — ledger IN/OUT/ADJUST (opsional `ticket_id`)
+- `EngineerContract` / `EngagementChangeLog` — lihat [ENGAGEMENT.md](./ENGAGEMENT.md)
 
 ---
 
@@ -187,6 +213,8 @@ Integration 1──* WebhookDeadLetter
 User 1──* AppNotification
 User 1──* PushDeviceToken
 User 1──* SkillCertification
+User 1──* EngineerContract
+User 1──* EngagementChangeLog
 ```
 
 ---

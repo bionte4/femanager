@@ -98,6 +98,102 @@ export async function listExpiringContracts(withinDays = 30) {
   });
 }
 
+export type RemindContractsResult = {
+  reminded_engineers: number;
+  reminded_admin: boolean;
+  contract_ids: string[];
+  days_matched: number[];
+};
+
+/**
+ * Cron harian: WA ke engineer + ringkasan admin saat sisa hari tepat 30/14/7/3.
+ * (Exact-day agar tidak spam tiap hari dalam window.)
+ */
+export async function remindExpiringContracts(
+  remindDays: number[] = [30, 14, 7, 3]
+): Promise<RemindContractsResult> {
+  const { sendWhatsApp } = await import("@/lib/whatsapp");
+  const now = new Date();
+  const maxDays = Math.max(...remindDays, 1);
+  const until = new Date(now.getTime() + maxDays * 24 * 60 * 60 * 1000);
+
+  const contracts = await prisma.engineerContract.findMany({
+    where: {
+      status: "ACTIVE",
+      end_at: { gte: now, lte: until },
+    },
+    include: {
+      user: {
+        select: { id: true, full_name: true, phone: true },
+      },
+    },
+  });
+
+  const matched: {
+    id: string;
+    days: number;
+    full_name: string;
+    phone: string;
+    type: string;
+    client_label: string | null;
+    end_at: Date;
+  }[] = [];
+
+  for (const c of contracts) {
+    const days = Math.ceil(
+      (c.end_at.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)
+    );
+    if (!remindDays.includes(days)) continue;
+    matched.push({
+      id: c.id,
+      days,
+      full_name: c.user.full_name,
+      phone: c.user.phone,
+      type: c.type,
+      client_label: c.client_label,
+      end_at: c.end_at,
+    });
+  }
+
+  let remindedEngineers = 0;
+  for (const m of matched) {
+    const endLabel = m.end_at.toLocaleDateString("id-ID", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+    const res = await sendWhatsApp({
+      phone: m.phone,
+      message:
+        `Pengingat kontrak PKWT FE-Track: berakhir dalam ${m.days} hari (${endLabel}).` +
+        (m.client_label ? ` Client: ${m.client_label}.` : "") +
+        ` Hubungi HR/admin untuk perpanjang jika masih aktif.`,
+    });
+    if (res.success) remindedEngineers += 1;
+  }
+
+  let remindedAdmin = false;
+  const adminPhone = process.env.ADMIN_WHATSAPP || process.env.ADMIN_PHONE;
+  if (adminPhone && matched.length > 0) {
+    const lines = matched
+      .slice(0, 15)
+      .map((m) => `${m.full_name} (${m.days}h)`)
+      .join(", ");
+    const res = await sendWhatsApp({
+      phone: adminPhone,
+      message: `FE-Track: ${matched.length} kontrak PKWT hampir expired (hari 30/14/7/3). ${lines}. Cek /admin/hr/contracts`,
+    });
+    remindedAdmin = res.success;
+  }
+
+  return {
+    reminded_engineers: remindedEngineers,
+    reminded_admin: remindedAdmin,
+    contract_ids: matched.map((m) => m.id),
+    days_matched: remindDays,
+  };
+}
+
 export function contractTypeToEngagement(
   type: "PKWT_OUTTASK" | "PKWT_INTERNAL" | string
 ): EngagementType {

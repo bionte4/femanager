@@ -523,9 +523,65 @@ export async function switchEngagementAction(
 
 export async function listEngagementChangeLogs(userId: string) {
   await requireContractAdmin();
-  return prisma.engagementChangeLog.findMany({
+  const logs = await prisma.engagementChangeLog.findMany({
     where: { user_id: userId },
     orderBy: { created_at: "desc" },
-    take: 20,
+    take: 30,
   });
+
+  const changerIds = Array.from(
+    new Set(logs.map((l) => l.changed_by).filter((id): id is string => !!id))
+  );
+  const changers =
+    changerIds.length > 0
+      ? await prisma.user.findMany({
+          where: { id: { in: changerIds } },
+          select: { id: true, full_name: true },
+        })
+      : [];
+  const nameById = Object.fromEntries(changers.map((c) => [c.id, c.full_name]));
+
+  return logs.map((l) => ({
+    ...l,
+    changed_by_name: l.changed_by ? (nameById[l.changed_by] ?? null) : null,
+  }));
+}
+
+/** Inbox HR: riwayat flip engagement lintas engineer */
+export async function listRecentEngagementChanges(limit = 40) {
+  await requireContractAdmin();
+  const logs = await prisma.engagementChangeLog.findMany({
+    orderBy: { created_at: "desc" },
+    take: Math.min(limit, 100),
+    include: {
+      user: {
+        select: { id: true, full_name: true, phone: true },
+      },
+    },
+  });
+
+  const changerIds = Array.from(
+    new Set(logs.map((l) => l.changed_by).filter((id): id is string => !!id))
+  );
+  const changers =
+    changerIds.length > 0
+      ? await prisma.user.findMany({
+          where: { id: { in: changerIds } },
+          select: { id: true, full_name: true },
+        })
+      : [];
+  const nameById = Object.fromEntries(changers.map((c) => [c.id, c.full_name]));
+
+  return logs.map((l) => ({
+    id: l.id,
+    user_id: l.user_id,
+    engineer_name: l.user.full_name,
+    engineer_phone: l.user.phone,
+    from_type: l.from_type,
+    to_type: l.to_type,
+    reason: l.reason,
+    changed_by: l.changed_by,
+    changed_by_name: l.changed_by ? (nameById[l.changed_by] ?? null) : null,
+    created_at: l.created_at,
+  }));
 }

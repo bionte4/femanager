@@ -50,6 +50,7 @@ type ChangeLog = {
   to_type: string;
   reason: string | null;
   created_at: Date | string;
+  changed_by_name?: string | null;
 };
 
 function fmtDate(d: Date | string) {
@@ -432,21 +433,29 @@ export function EngineerContractsClient({
         </Card>
       )}
 
-      {changeLogs.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Riwayat ganti engagement</CardTitle>
-          </CardHeader>
-          <CardContent>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Riwayat ganti engagement</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {changeLogs.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Belum ada audit flip MITRA ↔ PKWT untuk engineer ini.
+            </p>
+          ) : (
             <ul className="space-y-2 text-sm">
               {changeLogs.map((l) => (
-                <li key={l.id} className="border-b border-border pb-2 last:border-0">
+                <li
+                  key={l.id}
+                  className="border-b border-border pb-2 last:border-0"
+                >
                   <span className="font-medium">
                     {l.from_type} → {l.to_type}
                   </span>
                   <span className="text-muted-foreground">
                     {" "}
                     · {fmtDate(l.created_at)}
+                    {l.changed_by_name ? ` · oleh ${l.changed_by_name}` : ""}
                   </span>
                   {l.reason && (
                     <p className="text-xs text-muted-foreground">{l.reason}</p>
@@ -454,9 +463,9 @@ export function EngineerContractsClient({
                 </li>
               ))}
             </ul>
-          </CardContent>
-        </Card>
-      )}
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -29,8 +29,9 @@ curl -X POST http://localhost:3000/api/fraud/check/<TICKET_ID> \
 2. Resolve ticket B dengan **file byte-sama** (copy paste file).
 3. Sistem hash SHA256 foto original sebelum compress.
 4. Harus flag `PHOTO_DUPLICATE` severity **HIGH**.
-5. Ticket B status → `PENDING_REVIEW`, komisi **tidak** cair.
-6. Di Fraud Center tab **Pending Review** → Approve & Bayar / Reject & Suspend.
+5. Ticket B status → `PENDING_REVIEW`, komisi **tidak** cair (**Mitra only** — hold wallet).
+6. Engineer **PKWT**: flag fraud tetap dicatat di ticket log; **tidak** ada hold komisi / `PENDING_REVIEW` wallet (bayaran lewat payroll HR). Lihat [docs/ENGAGEMENT.md](./docs/ENGAGEMENT.md).
+7. Di Fraud Center tab **Pending Review** → Approve & Bayar / Reject & Suspend (alur Mitra).
 
 ## Test 3 — EXIF GPS mismatch → PHOTO_GPS_MISMATCH HIGH
 
@@ -56,7 +57,7 @@ curl -X POST http://localhost:3000/api/fraud/check/<TICKET_ID> \
 1. Admin: `/admin/leaderboard` → pilih period → **Recalculate**.
 2. Atau: `POST /api/leaderboard/recalculate` body `{"period":"month"}`.
 3. `GET /api/leaderboard?period=month` atau `?period=2025-01`.
-4. Engineer: `/engineer/leaderboard` tampil rank sendiri + top 10.
+4. Engineer **Mitra**: `/engineer/leaderboard` tampil rank sendiri + top 10. Engineer **PKWT** tidak masuk ranking / nav Rank disembunyikan.
 5. Export CSV dari admin leaderboard.
 
 Score formula:
@@ -67,7 +68,8 @@ Score formula:
 - [ ] Upload tanpa GPS → LOW tercatat
 - [ ] Foto sama 2 ticket → PHOTO_DUPLICATE HIGH
 - [ ] Check-in vs EXIF beda jauh → PHOTO_GPS_MISMATCH
-- [ ] HIGH fraud → PENDING_REVIEW, komisi ditahan
-- [ ] Admin Approve → RESOLVED + komisi cair
+- [ ] HIGH fraud **Mitra** → PENDING_REVIEW, komisi ditahan
+- [ ] HIGH fraud **PKWT** → flag log, tanpa hold wallet
+- [ ] Admin Approve → RESOLVED + komisi cair (Mitra)
 - [ ] Admin Reject → CLOSED + suspend
-- [ ] Leaderboard recalculate tampil di admin & engineer
+- [ ] Leaderboard recalculate tampil di admin & engineer Mitra

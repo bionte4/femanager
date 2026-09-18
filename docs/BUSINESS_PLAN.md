@@ -12,10 +12,11 @@ FE-Track adalah platform operasional yang menghubungkan **NOC (L0/L1)**, **dispa
 
 Nilai utama:
 - Auto-dispatch engineer terdekat + cocok skill/sertifikasi
+- **Dual engagement**: Mitra (komisi) dan PKWT outtask/internal (payroll + placement)
 - SLA countdown, stop-clock, dan laporan fase (response / travel / repair)
 - Jejak audit GPS + foto before/after + anti-fraud
 - Integrasi monitoring (Zabbix/Uptime) & ITSM customer via API/webhook
-- Model mitra (perjanjian e-sign, wallet, leaderboard, recruitment)
+- Model mitra (perjanjian e-sign, wallet, leaderboard, recruitment) + HR kontrak PKWT
 
 ---
 
@@ -36,8 +37,8 @@ Nilai utama:
 1. **Ops maturity L0→L1** — triage + handover wajib sebelum assign FE.
 2. **Dispatch cerdas** — jarak (PostGIS/haversine) + skill alias + sertifikasi aktif.
 3. **SLA governance** — stop-clock beralasan, pause audit, PDF laporan customer.
-4. **Trust layer** — check-in 100m, EXIF/hash foto, fraud hold commission.
-5. **Mitra scale** — PWA offline, wallet, recruitment funnel.
+4. **Trust layer** — check-in 100m, EXIF/hash foto, fraud hold commission (Mitra).
+5. **Dual workforce** — Mitra (PWA, wallet, recruitment) + PKWT (kontrak, placement, payroll HR).
 
 ---
 
@@ -53,8 +54,10 @@ Nilai utama:
 Persona internal:
 - **NOC L0** — monitoring & escalate
 - **NOC L1** — diagnosis & assign
-- **Field Engineer** — eksekusi lapangan
+- **Field Engineer Mitra** — freelance / fee per ticket
+- **Field Engineer PKWT** — kontrak outtask/internal + placement
 - **Ops Manager** — SLA %, cost, coverage
+- **HR / ADMIN_NOC** — kontrak PKWT & klasifikasi engagement
 
 ---
 
@@ -68,7 +71,7 @@ Persona internal:
 | **Premium NOC** | War room, dedicated L1 | Kontrak bulanan |
 | **Recruitment / certify** | Onboarding FE berbayar | Per batch / sertifikasi |
 
-Margin berasal dari selisih `price_customer` vs `fee_engineer` di `ServicePackage` + komisi aturan `CommissionRule`.
+Margin berasal dari selisih `price_customer` vs `fee_engineer` di `ServicePackage` + komisi aturan `CommissionRule` (**Mitra**). Engineer **PKWT** dihitung via payroll HR (bukan wallet ticket).
 
 ---
 
@@ -115,7 +118,9 @@ KPI yang dilacak di produk:
 | ✅ | Duplicate merge, skill/cert match |
 | ✅ | SLA phases, pause audit, customer PDF |
 | ✅ | War Room, offline harden, webhook DLQ |
-| ⏭ | FCM push, stock mutation ledger |
+| ✅ | FCM push, stock mutation ledger |
+| ✅ | **Mitra vs PKWT** (eligibility, kontrak, placement, isolasi pay) |
+| ✅ | Cron remind kontrak + audit flip UI + residual payout + payroll Mitra-only export |
 | ⏭ | Customer portal self-serve status |
 | ⏭ | Role matrix UI & playbook auto dari alert |
 
@@ -141,8 +146,8 @@ Positioning: **"SLA field ops OS untuk jaringan toko Indonesia."**
 | Product / Eng | Next.js platform, integrasi |
 | NOC L0/L1 | 24/7 atau shift sesuai kontrak |
 | Dispatcher | Peak / mass outage |
-| People ops | Recruitment & sertifikasi FE |
-| Finance | Payroll wallet & invoice customer |
+| People ops | Recruitment Mitra & kontrak PKWT |
+| Finance | Payroll wallet Mitra, invoice customer, payroll HR PKWT |
 
 ---
 
@@ -152,8 +157,9 @@ Positioning: **"SLA field ops OS untuk jaringan toko Indonesia."**
 |--------|----------|
 | Coverage FE tipis di daerah | Coordinator lokal + bonus tier 3 |
 | Abuse stop-clock | Pause audit + approval rule |
-| Fake GPS / foto | Fraud engine + hold commission |
-| Ketergantungan WA gateway | In-app bell + FCM (roadmap) |
+| Fake GPS / foto | Fraud engine + hold commission (Mitra); flag log PKWT |
+| Klasifikasi kerja salah | Engagement gate + kontrak RBAC + audit log |
+| Ketergantungan WA gateway | In-app bell + FCM |
 | Dispute SLA customer | PDF fase + ticket log immutable |
 
 ---
@@ -175,4 +181,4 @@ Positioning: **"SLA field ops OS untuk jaringan toko Indonesia."**
 2. Paket PDF SLA bulanan ke PIC customer.
 3. Rekrut FE kota berikutnya berdasarkan heatmap overdue.
 
-Dokumen terkait: [User Guide](./USER_GUIDE.md) · [Manual Guide](./MANUAL_GUIDE.md) · [ERD](./ERD.md)
+Dokumen terkait: [User Guide](./USER_GUIDE.md) · [Manual Guide](./MANUAL_GUIDE.md) · [Engagement](./ENGAGEMENT.md) · [ERD](./ERD.md)

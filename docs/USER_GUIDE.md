@@ -10,7 +10,7 @@ Panduan penggunaan untuk peran operasional: Super Admin, NOC L0, NOC L1, Dispatc
 2. Masuk dengan **nomor HP** + password.
 3. Redirect otomatis:
    - Role admin / NOC → `/admin/dashboard`
-   - Field Engineer → `/engineer/my-tickets` (wajib tanda tangan perjanjian dulu jika belum)
+   - Field Engineer → `/engineer/my-tickets` (gate: Mitra wajib perjanjian SIGNED; PKWT wajib kontrak ACTIVE)
 
 ---
 
@@ -18,11 +18,12 @@ Panduan penggunaan untuk peran operasional: Super Admin, NOC L0, NOC L1, Dispatc
 
 | Role | Fokus |
 |------|--------|
-| **SUPER_ADMIN** | Semua menu admin |
+| **SUPER_ADMIN** | Semua menu admin + switch engagement Mitra↔PKWT |
+| **ADMIN_NOC** | Operasi + **kelola kontrak PKWT** (`/admin/hr/contracts`) |
 | **NOC_L0** | Standby monitoring, dispatch, escalate ke L1 (wajib handover) |
 | **NOC_L1** | Antrian L1, cek device, assign field engineer |
-| **DISPATCHER / ADMIN_NOC** | Operasi tiket & master data |
-| **FIELD_ENGINEER** | PWA ticket aktif, check-in GPS, foto, resolve |
+| **DISPATCHER** | Operasi tiket & master data (bukan manage kontrak) |
+| **FIELD_ENGINEER** | PWA ticket aktif — tipe **Mitra** (komisi) atau **PKWT** (payroll) |
 
 ---
 
@@ -55,11 +56,14 @@ Sebaran toko & engineer (Mapbox). Status device hijau/merah.
 - Spareparts: Export/Import Excel dengan **preview** sebelum commit.
 - Ikon **History** di sparepart → ledger mutasi IN/OUT/ADJUST (tied ke ticket jika consume).
 
-### 3.6 Mitra
-- Engineers, sertifikasi skill, recruitment kandidat, leaderboard, legal perjanjian.
+### 3.6 Mitra & PKWT
+- **Engineers** — filter/badge engagement (Mitra / PKWT Outtask / PKWT Internal).
+- **Kontrak PKWT** (`/admin/hr/contracts`) — inbox hampir expire; detail di `/admin/engineers/[id]/contracts`. Hanya SUPER_ADMIN / ADMIN_NOC.
+- Sertifikasi skill, recruitment, leaderboard (**Mitra only**), legal perjanjian kemitraan.
+- Detail: [ENGAGEMENT.md](./ENGAGEMENT.md).
 
 ### 3.7 Keuangan & laporan
-- Payroll / wallet engineer.
+- **Payroll / wallet** — komisi & withdraw untuk **Mitra**. PKWT dibayar lewat payroll HR (bukan fee ticket).
 - **Reports**: filter tenant/kota/periode → Excel atau **PDF Customer**.
 - **Pause Audit**: ticket dengan pause tinggi; flag *Leakage* jika tanpa jejak sparepart.
 
@@ -77,16 +81,19 @@ Push FCM (opsional): set `FCM_SERVER_KEY` + `NEXT_PUBLIC_FIREBASE_*` — FE PWA 
 
 ### 4.1 Sebelum kerja
 1. Install PWA di HP (Add to Home Screen) jika tersedia.
-2. Tanda tangan **Perjanjian Kemitraan** di `/engineer/agreement`.
-3. Pastikan GPS aktif.
+2. **Mitra**: tanda tangan **Perjanjian Kemitraan** di `/engineer/agreement`.
+3. **PKWT**: pastikan kontrak ACTIVE dari HR (halaman blokir jika belum: `/engineer/employment-blocked`).
+4. Pastikan GPS aktif.
 
 ### 4.2 Alur ticket
-1. **Accept / Reject** job yang di-assign.
-2. **ON THE WAY** — GPS dicatat.
-3. **CHECK-IN ON SITE** — harus dalam radius ~100m dari toko.
-4. Checklist perangkat → **IN PROGRESS**.
-5. Upload foto **Before / After** (otomatis di-compress), notes, centang ping/LAN → **RESOLVED**.
-6. Escalate / butuh sparepart bila perlu.
+1. **Accept** job yang di-assign. **Reject**: Mitra bebas; **PKWT ditolak sistem** (kontrak kerja).
+2. Timeout accept **15 menit** → cron re-assign (Mitra) atau escalate khusus (PKWT).
+3. **ON THE WAY** — GPS dicatat.
+4. **CHECK-IN ON SITE** — harus dalam radius ~100m dari toko.
+5. Checklist perangkat → **IN PROGRESS**.
+6. Upload foto **Before / After** (otomatis di-compress), notes, centang ping/LAN → **RESOLVED**.
+7. Escalate / butuh sparepart bila perlu.
+8. Assign manual admin untuk PKWT wajib cocok **placement** (kota/tenant kontrak).
 
 ### 4.3 Offline
 - Aksi & foto disimpan lokal jika offline.
@@ -94,7 +101,8 @@ Push FCM (opsional): set `FCM_SERVER_KEY` + `NEXT_PUBLIC_FIREBASE_*` — FE PWA 
 - Jika ada **Conflict** (status server sudah berubah), buang aksi conflict dari badge.
 
 ### 4.4 Lainnya
-- History, wallet/withdraw, leaderboard, Knowledge Base SOP.
+- **Mitra**: history, wallet/withdraw, leaderboard, Knowledge Base SOP.
+- **PKWT**: history + KB; wallet/rank disembunyikan di nav; wallet page menampilkan pesan payroll HR.
 
 ---
 
@@ -118,6 +126,7 @@ Duplicate alert (device yang sama masih open) digabung ke ticket existing — ti
 - Pantau War Room saat peak / mass outage.
 - Cek Pause Audit mingguan untuk kebocoran SLA.
 - Cek Webhook DLQ jika customer ITSM tidak menerima update.
+- Cek inbox kontrak PKWT mingguan; jangan assign PKWT di luar placement.
 
 ---
 
@@ -126,8 +135,9 @@ Duplicate alert (device yang sama masih open) digabung ke ticket existing — ti
 | Dokumen | Isi |
 |---------|-----|
 | [Manual Guide](./MANUAL_GUIDE.md) | Setup teknis, env, cron, deploy |
+| [Engagement](./ENGAGEMENT.md) | Mitra vs PKWT |
 | [ERD](./ERD.md) | Model data & relasi |
 | [Business Plan](./BUSINESS_PLAN.md) | Model bisnis & roadmap |
 | [INTEGRATION_TESTING.md](../INTEGRATION_TESTING.md) | Uji Open API / webhook |
 | [FRAUD_TESTING.md](../FRAUD_TESTING.md) | Uji anti-fraud |
-| [LEGAL_COMPLIANCE.md](../LEGAL_COMPLIANCE.md) | Perjanjian mitra |
+| [LEGAL_COMPLIANCE.md](../LEGAL_COMPLIANCE.md) | Perjanjian mitra (bukan PKWT) |

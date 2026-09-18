@@ -10,6 +10,7 @@ Stack: **Next.js 14** (App Router) · **TypeScript** · **Tailwind** · **Prisma
 |---------|-----|
 | [docs/USER_GUIDE.md](./docs/USER_GUIDE.md) | Panduan pengguna (NOC / FE) |
 | [docs/MANUAL_GUIDE.md](./docs/MANUAL_GUIDE.md) | Manual teknis & operasi |
+| [docs/ENGAGEMENT.md](./docs/ENGAGEMENT.md) | Mitra vs PKWT (eligibility, kontrak, payroll) |
 | [docs/ERD.md](./docs/ERD.md) | ERD & model data |
 | [docs/BUSINESS_PLAN.md](./docs/BUSINESS_PLAN.md) | Business plan & roadmap |
 | [docs/README.md](./docs/README.md) | Indeks dokumentasi |
@@ -72,12 +73,20 @@ Seed berisi **100 tenant** se-Indonesia, **30 engineer**, dan stok sparepart.
 
 ---
 
-## Cron auto-dispatch
+## Cron
 
-Endpoint: `GET /api/cron/check-dispatch`  
 Auth: header `Authorization: Bearer <CRON_SECRET>` (wajib; tanpa secret → 401)
 
-Cek ticket `ASSIGNED` yang belum accept → re-assign / escalate.
+| Endpoint | Fungsi |
+|----------|--------|
+| `GET /api/cron/check-dispatch` | Ticket `ASSIGNED` belum accept → re-assign / escalate (PKWT escalate khusus) |
+| `GET /api/cron/expire-contracts` | Tandai kontrak PKWT lewat `end_at` → `EXPIRED` |
+| `GET /api/cron/remind-contracts` | WA reminder saat sisa hari kontrak tepat 30/14/7/3 |
+| `GET /api/cron/webhook-dlq` | Retry outbound webhook gagal |
+
+### Cron auto-dispatch
+
+Endpoint: `GET /api/cron/check-dispatch`
 
 ### macOS / Linux (crontab tiap 1 menit)
 
@@ -123,13 +132,15 @@ npm run db:studio    # Prisma Studio
 ## Fitur utama
 
 - Auto dispatch engineer terdekat (PostGIS / haversine fallback)
+- **Mitra vs PKWT** — eligibility, kontrak, placement, isolasi wallet/payroll ([docs/ENGAGEMENT.md](./docs/ENGAGEMENT.md))
 - SLA countdown & report Excel
 - Dashboard KPI + grafik
 - Peta monitoring tenant & engineer
 - PWA field engineer (GPS check-in 100m, offline, offline sync)
-- Inventory sparepart (gudang / engineer)
+- Inventory sparepart (gudang / engineer) + mutation ledger
 - Performance detail per engineer
 - Open API & Webhook integrasi customer ITSM (`/admin/integrations`)
+- FCM push (opsional) + stop-clock approval L1
 
 Lihat juga: [INTEGRATION_TESTING.md](./INTEGRATION_TESTING.md)
 

@@ -1,6 +1,8 @@
 # Legal Compliance — Model Kemitraan FE-Track
 
-Dokumen ini menjelaskan mengapa FE-Track memakai **model kemitraan** (bukan hubungan kerja), bagaimana aplikasi membuktikan kepatuhan, dan bagaimana menjawab pertanyaan Disnaker.
+Dokumen ini menjelaskan mengapa FE-Track memakai **model kemitraan** untuk engineer **Mitra** (bukan hubungan kerja), bagaimana aplikasi membuktikan kepatuhan, dan bagaimana menjawab pertanyaan Disnaker.
+
+> **Catatan PKWT:** Platform juga mendukung engineer dengan `engagement_type` `PKWT_OUTTASK` / `PKWT_INTERNAL` yang memakai **kontrak kerja** (`EngineerContract`) dan payroll HR — itu **bukan** model kemitraan. Isolasi operasional & pembayaran: [docs/ENGAGEMENT.md](./docs/ENGAGEMENT.md). Bagian di bawah berlaku untuk **Mitra saja**.
 
 ## Kenapa model kemitraan aman?
 
@@ -40,5 +42,6 @@ Bukti di sistem: accept/reject log, timeout 15 menit (bukan sanksi berat), trust
 - E-sign mitra: `/engineer/agreement`
 - PDF: `/api/agreement/[id]/pdf` atau tombol Download di profil
 - Seed: `PartnershipAgreement` v1.0 aktif + semua engineer dummy SIGNED
+- Klasifikasi Mitra vs PKWT: [docs/ENGAGEMENT.md](./docs/ENGAGEMENT.md)
 
 *Dokumen ini bukan opini hukum formal. Konsultasikan dengan kuasa hukum untuk audit resmi.*

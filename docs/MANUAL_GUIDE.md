@@ -105,7 +105,9 @@ Auth: `Authorization: Bearer <CRON_SECRET>`
 
 | Endpoint | Interval saran | Fungsi |
 |----------|----------------|--------|
-| `GET/POST /api/cron/check-dispatch` | 1 menit | Re-assign ticket ASSIGNED belum accept |
+| `GET/POST /api/cron/check-dispatch` | 1 menit | Re-assign / escalate ticket ASSIGNED belum accept (PKWT escalate khusus) |
+| `GET/POST /api/cron/expire-contracts` | harian | Status kontrak PKWT lewat `end_at` → `EXPIRED` |
+| `GET/POST /api/cron/remind-contracts` | harian | WA reminder engineer+admin saat sisa hari tepat 30/14/7/3 |
 | `GET/POST /api/cron/webhook-dlq` | 1–5 menit | Retry outbound webhook gagal |
 | `GET/POST /api/cron/remind-candidates` | harian | Reminder recruitment (jika dipakai) |
 
@@ -113,6 +115,8 @@ Contoh crontab:
 
 ```cron
 * * * * * curl -s -H "Authorization: Bearer $CRON_SECRET" https://YOUR_HOST/api/cron/check-dispatch
+0 2 * * * curl -s -H "Authorization: Bearer $CRON_SECRET" https://YOUR_HOST/api/cron/expire-contracts
+0 9 * * * curl -s -H "Authorization: Bearer $CRON_SECRET" https://YOUR_HOST/api/cron/remind-contracts
 */5 * * * * curl -s -H "Authorization: Bearer $CRON_SECRET" https://YOUR_HOST/api/cron/webhook-dlq
 ```
 
@@ -140,6 +144,8 @@ Outbound status → customer webhook; gagal setelah retry → **Webhook DLQ** (`
 | Fitur | Lokasi kode / UI |
 |-------|------------------|
 | Auto-dispatch + skill/cert match | `lib/dispatch.ts`, `lib/skill-match.ts` |
+| Mitra vs PKWT eligibility | `lib/eligibility.ts`, [ENGAGEMENT.md](./ENGAGEMENT.md) |
+| Kontrak PKWT + placement | `lib/contracts.ts`, `app/actions/contracts.ts`, `/admin/hr/contracts` |
 | Duplicate ticket merge | `lib/tickets/dedupe.ts` |
 | Handover L0→L1 | `l1_handover` JSON + `components/ticket/handover-form.tsx` |
 | Stop clock SLA | `lib/stop-clock.ts`, aksi di detail ticket |
@@ -147,6 +153,8 @@ Outbound status → customer webhook; gagal setelah retry → **Webhook DLQ** (`
 | Offline queue FE | `hooks/use-offline-sync.ts` |
 | War Room | `/admin/war-room` |
 | Customer SLA PDF | `lib/reports/customer-sla-pdf.ts` |
+| Commission isolasi Mitra | `lib/commission.ts` |
+| API session gate | `middleware.ts` + `lib/auth.config.ts` |
 
 ---
 
@@ -155,12 +163,14 @@ Outbound status → customer webhook; gagal setelah retry → **Webhook DLQ** (`
 - [ ] Ganti semua secret env (NextAuth, Cron, Webhook)
 - [ ] Hapus / ganti akun seed; buat admin production
 - [ ] RLS/backup Postgres terjadwal
-- [ ] Cron terpasang & monitored
+- [ ] Cron terpasang & monitored (`check-dispatch`, `expire-contracts`, `webhook-dlq`)
 - [ ] Mapbox token production
 - [ ] Storage foto (MinIO/S3) + backup
 - [ ] Uji webhook customer + DLQ replay
 - [ ] Uji GPS check-in 100m di lapangan
 - [ ] Soft-launch 1 kota sebelum nasional
+- [ ] Proses HR untuk engineer PKWT (kontrak + placement) terdokumentasi
+- [ ] Role kontrak: hanya SUPER_ADMIN / ADMIN_NOC yang kelola PKWT
 
 ---
 
@@ -170,10 +180,11 @@ Outbound status → customer webhook; gagal setelah retry → **Webhook DLQ** (`
 |--------|-----|
 | `prisma.X.findMany` undefined | `prisma generate` + restart dev server |
 | Cron 401 | `CRON_SECRET` set & header Bearer benar |
-| Ticket tidak auto-assign | Engineer AVAILABLE + skill/cert + lat/lng |
+| Ticket tidak auto-assign | Engineer AVAILABLE + skill/cert + lat/lng + eligible (Mitra signed / PKWT kontrak + placement) |
 | Check-in ditolak | Jarak > 100m atau GPS lemah |
+| Manual assign PKWT gagal | Di luar `placement_cities` / `placement_tenant_ids` |
 | Customer tidak dapat update | War Room KPI Webhook DLQ / halaman DLQ |
-| Sidebar menu hilang | Scroll nav; footer fixed bawah |
+| Sidebar menu hilang | Scroll nav; footer fixed bawah; menu Kontrak hanya SA/ADMIN_NOC |
 
 ---
 
@@ -196,6 +207,7 @@ docs/                # dokumentasi produk
 ## 12. Referensi
 
 - [User Guide](./USER_GUIDE.md)
+- [Engagement Mitra/PKWT](./ENGAGEMENT.md)
 - [ERD](./ERD.md)
 - [Business Plan](./BUSINESS_PLAN.md)
 - Root [README.md](../README.md)
