@@ -10,6 +10,7 @@ Stack: **Next.js 14** (App Router) · **TypeScript** · **Tailwind** · **Prisma
 |---------|-----|
 | [docs/USER_GUIDE.md](./docs/USER_GUIDE.md) | Panduan pengguna (NOC / FE) |
 | [docs/MANUAL_GUIDE.md](./docs/MANUAL_GUIDE.md) | Manual teknis & operasi |
+| [docs/DEPLOYMENT_VPS.md](./docs/DEPLOYMENT_VPS.md) | Deploy production di VPS |
 | [docs/ENGAGEMENT.md](./docs/ENGAGEMENT.md) | Mitra vs PKWT (eligibility, kontrak, payroll) |
 | [docs/ERD.md](./docs/ERD.md) | ERD & model data |
 | [docs/BUSINESS_PLAN.md](./docs/BUSINESS_PLAN.md) | Business plan & roadmap |

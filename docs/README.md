@@ -4,7 +4,8 @@
 |---------|-----------|
 | [USER_GUIDE.md](./USER_GUIDE.md) | Panduan pengguna NOC L0/L1, Admin, Field Engineer |
 | [MANUAL_GUIDE.md](./MANUAL_GUIDE.md) | Setup teknis, env, cron, troubleshooting, go-live |
-| [ENGAGEMENT.md](./ENGAGEMENT.md) | **Mitra vs PKWT** — eligibility, kontrak, payroll, RBAC |
+| [DEPLOYMENT_VPS.md](./DEPLOYMENT_VPS.md) | **Deploy production di VPS** (Nginx, PM2, Docker, SSL, cron) |
+| [ENGAGEMENT.md](./ENGAGEMENT.md) | Mitra vs PKWT — eligibility, kontrak, payroll, RBAC |
 | [ERD.md](./ERD.md) | Entity Relationship Diagram (Mermaid) + kamus model |
 | [BUSINESS_PLAN.md](./BUSINESS_PLAN.md) | Model bisnis, GTM, roadmap, risiko |
 

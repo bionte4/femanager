@@ -160,17 +160,20 @@ Outbound status → customer webhook; gagal setelah retry → **Webhook DLQ** (`
 
 ## 9. Checklist go-live
 
+Lihat juga checklist VPS lengkap: [DEPLOYMENT_VPS.md](./DEPLOYMENT_VPS.md).
+
 - [ ] Ganti semua secret env (NextAuth, Cron, Webhook)
 - [ ] Hapus / ganti akun seed; buat admin production
 - [ ] RLS/backup Postgres terjadwal
-- [ ] Cron terpasang & monitored (`check-dispatch`, `expire-contracts`, `webhook-dlq`)
+- [ ] Cron terpasang & monitored (`check-dispatch`, `expire-contracts`, `remind-contracts`, `webhook-dlq`)
 - [ ] Mapbox token production
-- [ ] Storage foto (MinIO/S3) + backup
+- [ ] Storage foto (`public/uploads`) + backup
 - [ ] Uji webhook customer + DLQ replay
 - [ ] Uji GPS check-in 100m di lapangan
 - [ ] Soft-launch 1 kota sebelum nasional
 - [ ] Proses HR untuk engineer PKWT (kontrak + placement) terdokumentasi
 - [ ] Role kontrak: hanya SUPER_ADMIN / ADMIN_NOC yang kelola PKWT
+- [ ] HTTPS + `NEXTAUTH_URL` domain production
 
 ---
 
@@ -208,6 +211,7 @@ docs/                # dokumentasi produk
 
 - [User Guide](./USER_GUIDE.md)
 - [Engagement Mitra/PKWT](./ENGAGEMENT.md)
+- [Deployment VPS](./DEPLOYMENT_VPS.md)
 - [ERD](./ERD.md)
 - [Business Plan](./BUSINESS_PLAN.md)
 - Root [README.md](../README.md)
