@@ -1,0 +1,107 @@
+Siap, ini `.cursorrules` super lengkap khusus buat project kamu. Tinggal copy paste jadi file `.cursorrules` di root project Cursor kamu.
+
+Ini udah aku optimasi biar Cursor paham konteks *SLA Field Engineer EDC/LAN/WAN Indonesia*.
+
+# PROJECT: FE-Track - Field Engineer Dispatch & SLA Management Platform
+
+## 1. PROJECT OVERVIEW
+Kamu adalah Senior Fullstack Developer. Kita membangun aplikasi untuk manage ribuan tenant/toko yang tersebar dari kota besar sampai kecamatan di seluruh Indonesia.
+Tugas field engineer (SMK/S1 freelance) adalah Monitoring, PM/CM, Perbaikan EDC/LAN/WAN, dan Escalasi. Goal utama: SLA MEET 99%.
+
+Stack Utama: Next.js 14 App Router, TypeScript, Tailwind CSS, shadcn/ui, Supabase (PostgreSQL + Auth + Storage + Realtime), Mapbox, PWA.
+
+## 2. TECH STACK & RULES (WAJIB PATUH)
+- Framework: Next.js 14 dengan App Router, bukan Pages Router.
+- Language: 100% TypeScript. Jangan pakai `any`. Buat type/interface yang jelas.
+- Styling: Tailwind CSS + shadcn/ui. Design harus mobile-first, clean, profesional seperti dashboard modern.
+- Backend: Supabase. Gunakan Row Level Security (RLS) untuk semua tabel.
+- Database: PostgreSQL dengan extension PostGIS untuk hitung jarak engineer terdekat (ST_Distance).
+- State Management: Zustand untuk state global. TanStack Query (React Query) untuk data fetching.
+- Form: React Hook Form + Zod untuk validasi.
+- Map: Mapbox GL JS untuk peta sebaran toko & engineer.
+- PWA: Harus bisa offline mode untuk app field engineer. Gunakan IndexedDB / localForage untuk sync ticket saat offline.
+- Notification: Siapkan service untuk integrasi Fonnte/Wablas WA Gateway dan Firebase Cloud Messaging (FCM).
+
+## 3. DATABASE SCHEMA (BUAT SESUAI INI)
+Buat migration SQL untuk tabel-tabel ini di Supabase:
+
+1. profiles: id (uuid fk auth.users), full_name, role (enum: super_admin, admin_noc, dispatcher, field_engineer), phone, city, district, sub_district, lat, lng, skills (array: EDC, LAN, WAN), status (available, busy, offline), rating
+2. tenants: id, name, code, address, province, city, district, sub_district, lat, lng, pic_name, pic_phone, sla_tier (tier1_jabodetabek, tier2_province, tier3_kabupaten), is_active
+3. devices: id, tenant_id (fk), type (EDC_BCA, EDC_BRI, ROUTER, SWITCH), brand, serial_number, ip_address, status (up, down, maintenance), last_check_at
+4. sla_configs: id, tier_name, response_time_minutes, resolution_time_minutes (contoh: tier1 = 240 menit)
+5. tickets: id, ticket_no (auto generate FE-YYYYMMDD-XXXX), tenant_id, device_id, type (INCIDENT, PM, CM), priority (low, medium, high, critical), status (open, assigned, on_the_way, on_site, in_progress, pending_sparepart, escalated, resolved, closed), reported_by, description, assigned_engineer_id, sla_due_at, response_at, resolved_at, created_at
+6. ticket_logs: id, ticket_id, status_from, status_to, changed_by, notes, lat, lng, photo_url (array), created_at
+7. spareparts: id, name, sku, stock_qty, location_type (warehouse, engineer), holder_id
+
+PENTING: Semua tabel wajib punya RLS. Field engineer hanya bisa lihat ticket yang assigned ke dia.
+
+## 4. CORE BUSINESS LOGIC (LOGIKA PALING PENTING)
+
+### A. Auto Dispatch Engine
+Buatkan function `autoDispatchTicket(ticketId)`:
+1. Ambil lat/lng tenant dari ticket
+2. Query engineer dengan PostGIS: `SELECT * FROM profiles WHERE role='field_engineer' AND status='available' ORDER BY ST_Distance(location, tenant_location) LIMIT 5`
+3. Filter yang skill nya sesuai device type
+4. Assign ke engineer terdekat #1, set ticket status = assigned
+5. Kirim notifikasi WA via Edge Function ke engineer. Jika tidak di-accept dalam 10 menit (cron job), auto re-assign ke engineer #2 dan escalate.
+6. Hitung sla_due_at berdasarkan sla_configs tier tenant.
+
+### B. SLA Countdown & Status Flow
+- Status wajib berurutan: open -> assigned -> on_the_way (wajib GPS check) -> on_site (wajib check-in GPS radius 100m dari toko) -> in_progress -> resolved -> closed
+- Hitung SLA breach: jika now() > sla_due_at dan status != resolved/closed, maka status = overdue
+- Semua perubahan status WAJIB simpan ke ticket_logs dengan foto, lat/lng, dan notes
+
+### C. Field Engineer PWA Rules
+- Halaman /engineer harus PWA installable
+- Tombol Check-in: Validasi jarak GPS. Jika jarak > 100m dari tenant, tolak check-in.
+- Upload Foto: Wajib Before/After. Compress image di client side sebelum upload ke Supabase Storage bucket `ticket-photos`.
+- Offline Mode: Jika offline, simpan log ke IndexedDB. Begitu online, auto sync.
+
+## 5. FOLDER STRUCTURE
+
+/app
+ /(admin)/dashboard, /tenants, /engineers, /tickets, /map, /reports
+ /(engineer)/my-tickets, /history
+ /api/webhooks/monitoring (untuk terima alert dari Zabbix/Uptime Kuma)
+/components
+ /ui (shadcn)
+ /map, /ticket, /sla-countdown
+/lib
+ /supabase
+ /utils (distance calculator, sla calculator, ticket generator)
+/supabase/migrations
+
+
+## 6. UI/UX RULES
+- Dashboard Admin: Tampilkan KPI Cards: Total Toko Down, Ticket Overdue, SLA Achievement %, Engineer Available. Di bawahnya ada Peta Mapbox dengan cluster titik toko (merah=down, hijau=up) dan tabel ticket terbaru.
+- SLA Countdown Component: Buat komponen <SLACountdown dueAt={...} /> yang berubah warna: hijau >2 jam, kuning <2 jam, merah = overdue + blink.
+- Mobile Engineer: UI super simple, tombol besar, font besar. Fokus ke 1 ticket aktif saja.
+
+## 7. CODING CONVENTION
+- Selalu buat file terpisah, jangan taruh semua logic di page.tsx
+- Buat Server Actions di `app/actions/` untuk mutasi data
+- Gunakan Supabase Realtime untuk update status ticket secara live di dashboard NOC
+- Setiap buat fitur baru, buatkan juga RLS policies nya
+- Komentar dalam Bahasa Indonesia untuk logic bisnis yang kompleks
+
+## 8. JANGAN LAKUKAN INI
+- JANGAN pakai mock data. Langsung konek ke Supabase.
+- JANGAN lupa handle error dan loading state.
+- JANGAN buat UI desktop only. Semua harus responsive untuk HP.
+
+## 9. OUTPUT YANG DIHARAPKAN
+Saat saya minta fitur, langsung generate code lengkap: component, supabase query, types, dan SQL migration jika butuh tabel baru. Langsung bisa run `npm run dev`.
+
+Cara Pakai:
+
+1. Buka Cursor -> Buat project http://Next.js baru: `npx create-next-app@latest fe-track`
+2. Paste file di atas jadi `.cursorrules` di root
+3. Prompt pertama ke Cursor:
+
+> "Setup project sesuai.cursorrules. Buat migration SQL untuk semua tabel + RLS + PostGIS extension, setup Supabase client, dan buat dashboard admin layout dengan sidebar"
+
+4. Prompt kedua:
+
+> "Buatkan fitur auto dispatch engine + SLA countdown component + PWA halaman engineer dengan GPS check-in 100m"
+
+Mau aku bikinin juga *prompt SQL Migration Supabase* siap paste nya biar gak error PostGIS?

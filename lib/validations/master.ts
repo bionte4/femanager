@@ -1,0 +1,94 @@
+import { z } from "zod";
+
+export const slaTierEnum = z.enum([
+  "TIER1_JABODETABEK",
+  "TIER2_PROVINCE",
+  "TIER3_KABUPATEN",
+]);
+
+export const deviceTypeEnum = z.enum([
+  "EDC_BCA",
+  "EDC_BRI",
+  "ROUTER",
+  "ROUTER_SDWAN",
+  "SWITCH",
+]);
+
+export const deviceCategoryEnum = z.enum([
+  "EDC",
+  "ROUTER_SDWAN",
+  "SWITCH",
+  "ACCESS_POINT",
+  "SERVER",
+]);
+
+export const deviceStatusEnum = z.enum(["UP", "DOWN", "MAINTENANCE"]);
+
+export const skillEnum = z.enum([
+  "EDC",
+  "SDWAN",
+  "DESKTOP",
+  "LAPTOP",
+  "WIFI",
+  "CCTV",
+  "PRINTER",
+]);
+
+export const engineerStatusEnum = z.enum(["AVAILABLE", "BUSY", "OFFLINE"]);
+
+export const tenantSchema = z.object({
+  name: z.string().min(2, "Nama minimal 2 karakter"),
+  code: z
+    .string()
+    .min(3, "Kode minimal 3 karakter")
+    .max(32)
+    .regex(/^[A-Z0-9-]+$/, "Kode hanya huruf besar, angka, dan -"),
+  address: z.string().min(5, "Alamat wajib diisi"),
+  province: z.string().min(2, "Provinsi wajib"),
+  city: z.string().min(2, "Kota wajib"),
+  district: z.string().min(2, "Kecamatan wajib"),
+  sub_district: z.string().optional().nullable(),
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
+  pic_name: z.string().optional().nullable(),
+  pic_phone: z.string().optional().nullable(),
+  sla_tier: slaTierEnum,
+  is_active: z.boolean().default(true),
+});
+
+export const deviceSchema = z.object({
+  tenant_id: z.string().min(1, "Tenant wajib dipilih"),
+  type: deviceTypeEnum,
+  device_category: deviceCategoryEnum.optional(),
+  brand: z.string().optional().nullable(),
+  serial_number: z.string().min(3, "Serial number wajib"),
+  ip_address: z.string().optional().nullable(),
+  status: deviceStatusEnum,
+});
+
+export const engineerSchema = z.object({
+  full_name: z.string().min(2, "Nama minimal 2 karakter"),
+  phone: z
+    .string()
+    .min(10, "Nomor HP tidak valid")
+    .max(15)
+    .regex(/^08\d+$/, "Gunakan format 08xxxxxxxxxx"),
+  password: z.string().min(6, "Password minimal 6 karakter").optional(),
+  city: z.string().optional().nullable(),
+  district: z.string().optional().nullable(),
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
+  skills: z.array(z.string().min(1)).min(1, "Pilih minimal 1 skill"),
+  status: engineerStatusEnum,
+});
+
+export const slaConfigSchema = z.object({
+  id: z.string().min(1),
+  response_time_minutes: z.number().int().min(1).max(10080),
+  resolution_time_minutes: z.number().int().min(1).max(20160),
+});
+
+export type TenantInput = z.infer<typeof tenantSchema>;
+export type DeviceInput = z.infer<typeof deviceSchema>;
+export type EngineerInput = z.infer<typeof engineerSchema>;
+export type SlaConfigInput = z.infer<typeof slaConfigSchema>;

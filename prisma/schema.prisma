@@ -1,0 +1,730 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== ENUMS ====================
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN_NOC
+  DISPATCHER
+  FIELD_ENGINEER
+  /// L0 — standby monitoring & dispatcher (escalate ke L1)
+  NOC_L0
+  /// L1 — cek device & assign field engineer
+  NOC_L1
+}
+
+enum Skill {
+  EDC
+  LAN
+  WAN
+}
+
+enum EngineerStatus {
+  AVAILABLE
+  BUSY
+  OFFLINE
+}
+
+enum SlaTier {
+  TIER1_JABODETABEK
+  TIER2_PROVINCE
+  TIER3_KABUPATEN
+}
+
+enum DeviceType {
+  EDC_BCA
+  EDC_BRI
+  ROUTER
+  ROUTER_SDWAN
+  SWITCH
+}
+
+enum DeviceCategory {
+  EDC
+  ROUTER_SDWAN
+  SWITCH
+  ACCESS_POINT
+  SERVER
+}
+
+enum DeviceStatus {
+  UP
+  DOWN
+  MAINTENANCE
+}
+
+enum TicketType {
+  INCIDENT
+  PM
+  CM
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TicketStatus {
+  OPEN
+  ASSIGNED
+  ON_THE_WAY
+  ON_SITE
+  IN_PROGRESS
+  PENDING_SPAREPART
+  ESCALATED
+  /// Antrian L1 setelah L0 escalate
+  PENDING_L1
+  PENDING_REVIEW
+  RESOLVED
+  CLOSED
+}
+
+enum LocationType {
+  WAREHOUSE
+  ENGINEER
+}
+
+enum TransactionType {
+  EARN
+  BONUS
+  PENALTY
+  WITHDRAW
+  ADJUSTMENT
+}
+
+enum WithdrawalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAID
+}
+
+enum FraudType {
+  FAKE_GPS
+  PHOTO_DUPLICATE
+  FAST_CHECKIN
+  LOCATION_JUMP
+  PHOTO_GPS_MISMATCH
+  TIME_ANOMALY
+}
+
+enum FraudSeverity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum CandidateStatus {
+  NEW
+  SCREENING
+  TRAINING
+  TRIAL
+  APPROVED
+  REJECTED
+  BLACKLISTED
+}
+
+enum AgreementStatus {
+  PENDING
+  SIGNED
+  EXPIRED
+  REVOKED
+}
+
+enum ComplianceType {
+  JOB_ACCEPT
+  JOB_REJECT
+  JOB_TIMEOUT
+  LOGIN
+  LOGOUT
+  TOOL_CHECK
+  AGREEMENT_SIGNED
+}
+
+enum PartnershipStatus {
+  NOT_SIGNED
+  SIGNED
+  EXPIRED
+}
+
+// ==================== MODELS ====================
+
+model User {
+  id            String         @id @default(cuid())
+  full_name     String
+  phone         String         @unique
+  password      String
+  role          Role
+  city          String?
+  district      String?
+  sub_district  String?
+  lat           Float?
+  lng           Float?
+  /// Kode ServiceCategory: EDC, SDWAN, DESKTOP, LAPTOP, WIFI, CCTV, PRINTER
+  skills        String[]       @default([])
+  status        EngineerStatus @default(OFFLINE)
+  rating        Float          @default(5.0)
+  is_suspended  Boolean        @default(false)
+  suspended_reason String?
+  trust_score   Float          @default(100.0)
+  is_coordinator Boolean       @default(false)
+  has_motorcycle Boolean       @default(false)
+  has_toolkit    Boolean       @default(false)
+  has_car        Boolean       @default(false)
+  partnership_status PartnershipStatus @default(NOT_SIGNED)
+  /// ["motorcycle", "toolkit", "laptop", "bor", "tangga", "car"]
+  tools_owned    Json?
+  can_work_for_others Boolean  @default(true)
+  created_at    DateTime       @default(now())
+  updated_at    DateTime       @updatedAt
+
+  assigned_tickets Ticket[]     @relation("AssignedEngineer")
+  ticket_logs      TicketLog[]
+  spareparts       Sparepart[]  @relation("SparepartHolder")
+  wallet           EngineerWallet?
+  withdrawals      Withdrawal[]
+  ratings          EngineerRating[]
+  fraud_logs       FraudLog[]
+  leaderboard      LeaderboardSnapshot[]
+  recruits         EngineerCandidate[] @relation("CoordinatorRecruits")
+  certifications   SkillCertification[]
+  agreements       EngineerAgreement[]
+  compliance_logs  ComplianceLog[]
+  notifications    AppNotification[]
+
+  @@map("users")
+}
+
+model Tenant {
+  id           String   @id @default(cuid())
+  name         String
+  code         String   @unique
+  address      String
+  province     String
+  city         String
+  district     String
+  sub_district String?
+  lat          Float
+  lng          Float
+  pic_name     String?
+  pic_phone    String?
+  sla_tier     SlaTier  @default(TIER1_JABODETABEK)
+  is_active    Boolean  @default(true)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  devices Device[]
+  tickets Ticket[]
+
+  @@map("tenants")
+}
+
+model Device {
+  id                   String          @id @default(cuid())
+  tenant_id            String
+  type                 DeviceType      @default(EDC_BCA)
+  device_category      DeviceCategory  @default(EDC)
+  service_category_id  String?
+  brand                String?
+  model                String?
+  serial_number        String          @unique
+  ip_address           String?
+  status               DeviceStatus    @default(UP)
+  last_check_at        DateTime?
+  sdwan_profile        Json?
+  created_at           DateTime        @default(now())
+  updated_at           DateTime        @updatedAt
+
+  tenant            Tenant           @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  service_category  ServiceCategory? @relation(fields: [service_category_id], references: [id], onDelete: SetNull)
+  tickets           Ticket[]
+
+  @@index([device_category])
+  @@index([service_category_id])
+  @@map("devices")
+}
+
+model SlaConfig {
+  id                       String  @id @default(cuid())
+  tier_name                SlaTier @unique
+  response_time_minutes    Int
+  resolution_time_minutes  Int
+  created_at               DateTime @default(now())
+  updated_at               DateTime @updatedAt
+
+  @@map("sla_configs")
+}
+
+model Ticket {
+  id                    String       @id @default(cuid())
+  ticket_no             String       @unique
+  tenant_id             String
+  device_id             String?
+  service_category_id   String?
+  service_package_id    String?
+  type                  TicketType   @default(INCIDENT)
+  priority              Priority     @default(MEDIUM)
+  status                TicketStatus @default(OPEN)
+  reported_by           String?
+  description           String
+  assigned_engineer_id  String?
+  required_engineers    Int          @default(1)
+  /// ADMIN | PUBLIC_ORDER | WEBHOOK | EXTERNAL
+  source                String       @default("ADMIN")
+  sla_due_at            DateTime?
+  response_at           DateTime?
+  resolved_at           DateTime?
+  dispatch_attempts     Int          @default(0)
+  last_assigned_at      DateTime?
+  accepted_at           DateTime?
+  tried_engineer_ids    String[]     @default([])
+  /// Engineer IDs yang menolak job (bukti bebas menolak)
+  rejected_by           String[]     @default([])
+  /// Stop clock SLA: saat di-pause, catat waktu mulai pause
+  sla_paused_at         DateTime?
+  sla_paused_total_ms   Int          @default(0)
+  stop_clock_reason     String?
+  escalated_to_l1_at    DateTime?
+  escalated_by_id       String?
+  commission_calculated Boolean      @default(false)
+  commission_amount     Int?
+  sdwan_checklist       Json?
+  is_swa                String?
+  created_at            DateTime     @default(now())
+  updated_at            DateTime     @updatedAt
+
+  tenant             Tenant           @relation(fields: [tenant_id], references: [id])
+  device             Device?          @relation(fields: [device_id], references: [id])
+  service_category   ServiceCategory? @relation(fields: [service_category_id], references: [id], onDelete: SetNull)
+  service_package    ServicePackage?  @relation(fields: [service_package_id], references: [id], onDelete: SetNull)
+  assigned_engineer  User?            @relation("AssignedEngineer", fields: [assigned_engineer_id], references: [id])
+  logs               TicketLog[]
+  external_ticket    ExternalTicket?
+  wallet_transactions WalletTransaction[]
+  rating             EngineerRating?
+  fraud_logs         FraudLog[]
+
+  @@index([status])
+  @@index([assigned_engineer_id])
+  @@index([tenant_id])
+  @@index([service_category_id])
+  @@index([status, last_assigned_at])
+  @@map("tickets")
+}
+
+model TicketLog {
+  id             String        @id @default(cuid())
+  ticket_id      String
+  status_from    TicketStatus?
+  status_to      TicketStatus
+  changed_by     String?
+  notes          String?
+  lat            Float?
+  lng            Float?
+  photo_url      String[]
+  photo_hash     String?
+  exif_lat       Float?
+  exif_lng       Float?
+  exif_timestamp DateTime?
+  created_at     DateTime      @default(now())
+
+  ticket  Ticket @relation(fields: [ticket_id], references: [id], onDelete: Cascade)
+  changer User?  @relation(fields: [changed_by], references: [id])
+
+  @@index([ticket_id])
+  @@index([photo_hash])
+  @@map("ticket_logs")
+}
+
+model Sparepart {
+  id            String       @id @default(cuid())
+  name          String
+  sku           String       @unique
+  stock_qty     Int          @default(0)
+  location_type LocationType @default(WAREHOUSE)
+  holder_id     String?
+  created_at    DateTime     @default(now())
+  updated_at    DateTime     @updatedAt
+
+  holder User? @relation("SparepartHolder", fields: [holder_id], references: [id])
+
+  @@map("spareparts")
+}
+
+model Integration {
+  id               String           @id @default(cuid())
+  customer_name    String
+  /// API key plain (untuk lookup X-API-KEY). Jangan pernah log ke console.
+  api_key          String           @unique
+  api_key_hash     String
+  webhook_url      String?
+  webhook_secret   String?
+  is_active        Boolean          @default(true)
+  last_used_at     DateTime?
+  created_at       DateTime         @default(now())
+  updated_at       DateTime         @updatedAt
+
+  external_tickets ExternalTicket[]
+
+  @@map("integrations")
+}
+
+model ExternalTicket {
+  id                 String      @id @default(cuid())
+  integration_id     String
+  external_ticket_id String
+  internal_ticket_id String      @unique
+  last_payload       Json?
+  last_response      Json?
+  created_at         DateTime    @default(now())
+  updated_at         DateTime    @updatedAt
+
+  integration    Integration @relation(fields: [integration_id], references: [id], onDelete: Cascade)
+  internal_ticket Ticket     @relation(fields: [internal_ticket_id], references: [id], onDelete: Cascade)
+
+  @@unique([integration_id, external_ticket_id])
+  @@index([integration_id])
+  @@map("external_tickets")
+}
+
+model CommissionRule {
+  id                   String   @id @default(cuid())
+  name                 String
+  device_type          DeviceType?
+  service_category_id  String?
+  sla_tier             SlaTier?
+  ticket_type          TicketType
+  base_fee             Int
+  bonus_ontime_fee     Int      @default(0)
+  penalty_breach_fee   Int      @default(0)
+  is_active            Boolean  @default(true)
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
+
+  service_category ServiceCategory? @relation(fields: [service_category_id], references: [id], onDelete: SetNull)
+
+  @@index([service_category_id])
+  @@map("commission_rules")
+}
+
+model EngineerWallet {
+  id              String   @id @default(cuid())
+  engineer_id     String   @unique
+  balance         Int      @default(0)
+  total_earned    Int      @default(0)
+  total_withdrawn Int      @default(0)
+  total_penalty   Int      @default(0)
+  updated_at      DateTime @updatedAt
+  created_at      DateTime @default(now())
+
+  engineer     User               @relation(fields: [engineer_id], references: [id], onDelete: Cascade)
+  transactions WalletTransaction[]
+
+  @@map("engineer_wallets")
+}
+
+model WalletTransaction {
+  id          String          @id @default(cuid())
+  wallet_id   String
+  ticket_id   String?
+  type        TransactionType
+  amount      Int
+  description String
+  created_at  DateTime        @default(now())
+  created_by  String?
+
+  wallet EngineerWallet @relation(fields: [wallet_id], references: [id], onDelete: Cascade)
+  ticket Ticket?        @relation(fields: [ticket_id], references: [id], onDelete: SetNull)
+
+  @@index([wallet_id])
+  @@index([ticket_id])
+  @@index([type])
+  @@index([created_at])
+  @@map("wallet_transactions")
+}
+
+model Withdrawal {
+  id                String           @id @default(cuid())
+  engineer_id       String
+  amount            Int
+  bank_name         String
+  bank_account_no   String
+  bank_account_name String
+  status            WithdrawalStatus @default(PENDING)
+  requested_at      DateTime         @default(now())
+  processed_at      DateTime?
+  processed_by      String?
+  notes             String?
+
+  engineer User @relation(fields: [engineer_id], references: [id], onDelete: Cascade)
+
+  @@index([engineer_id])
+  @@index([status])
+  @@map("withdrawals")
+}
+
+model EngineerRating {
+  id             String   @id @default(cuid())
+  engineer_id    String
+  ticket_id      String   @unique
+  tenant_rating  Int?
+  tenant_comment String?
+  system_score   Float
+  fraud_flags    String[]
+  is_fraud       Boolean  @default(false)
+  created_at     DateTime @default(now())
+
+  engineer User   @relation(fields: [engineer_id], references: [id], onDelete: Cascade)
+  ticket   Ticket @relation(fields: [ticket_id], references: [id], onDelete: Cascade)
+
+  @@index([engineer_id])
+  @@map("engineer_ratings")
+}
+
+model FraudLog {
+  id          String        @id @default(cuid())
+  engineer_id String
+  ticket_id   String
+  type        FraudType
+  severity    FraudSeverity
+  description String
+  metadata    Json?
+  is_resolved Boolean       @default(false)
+  created_at  DateTime      @default(now())
+
+  engineer User   @relation(fields: [engineer_id], references: [id], onDelete: Cascade)
+  ticket   Ticket @relation(fields: [ticket_id], references: [id], onDelete: Cascade)
+
+  @@index([engineer_id])
+  @@index([ticket_id])
+  @@index([severity])
+  @@index([created_at])
+  @@map("fraud_logs")
+}
+
+model LeaderboardSnapshot {
+  id                  String   @id @default(cuid())
+  period              String
+  engineer_id         String
+  total_tickets       Int
+  sla_meet_rate       Float
+  avg_resolve_minutes Float
+  total_earnings      Int
+  fraud_count         Int
+  score               Float
+  rank                Int
+  created_at          DateTime @default(now())
+
+  engineer User @relation(fields: [engineer_id], references: [id], onDelete: Cascade)
+
+  @@unique([period, engineer_id])
+  @@index([period, rank])
+  @@map("leaderboard_snapshots")
+}
+
+model EngineerCandidate {
+  id                       String          @id @default(cuid())
+  full_name                String
+  phone                    String          @unique
+  whatsapp                 String
+  email                    String?
+  nik                      String?
+  address                  String
+  province                 String
+  city                     String
+  district                 String
+  lat                      Float?
+  lng                      Float?
+  education                String
+  school_name              String?
+  has_motorcycle           Boolean         @default(false)
+  has_toolkit              Boolean         @default(false)
+  has_laptop               Boolean         @default(false)
+  has_car                  Boolean         @default(false)
+  has_ladder               Boolean         @default(false)
+  has_drill                Boolean         @default(false)
+  skills                   String[]
+  experience_years         Int             @default(0)
+  previous_vendor          String?
+  bank_name                String?
+  bank_account_no          String?
+  bank_account_name        String?
+  id_card_photo_url        String?
+  selfie_photo_url         String?
+  status                   CandidateStatus @default(NEW)
+  screening_score          Int?
+  training_score           Int?
+  training_certificate_url String?
+  trial_tickets_completed  Int             @default(0)
+  trust_score_initial      Float           @default(100)
+  assigned_coordinator_id  String?
+  notes                    String?
+  rejection_reason         String?
+  created_at               DateTime        @default(now())
+  updated_at               DateTime        @updatedAt
+
+  coordinator User? @relation("CoordinatorRecruits", fields: [assigned_coordinator_id], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([province, city])
+  @@index([assigned_coordinator_id])
+  @@index([created_at])
+  @@map("engineer_candidates")
+}
+
+model SkillCertification {
+  id               String    @id @default(cuid())
+  engineer_id      String
+  skill            String
+  level            String    @default("BASIC")
+  certified_at     DateTime  @default(now())
+  certified_by     String?
+  expiry_at        DateTime?
+  certificate_url  String?
+  is_active        Boolean   @default(true)
+
+  engineer User @relation(fields: [engineer_id], references: [id], onDelete: Cascade)
+
+  @@index([engineer_id])
+  @@index([skill, is_active])
+  @@map("skill_certifications")
+}
+
+model KnowledgeBase {
+  id         String   @id @default(cuid())
+  title      String
+  category   String
+  content    String
+  video_url  String?
+  file_url   String?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([category])
+  @@map("knowledge_base")
+}
+
+model ServiceCategory {
+  id                         String   @id @default(cuid())
+  code                       String   @unique
+  name                       String
+  icon                       String?
+  base_fee_tier1             Int
+  base_fee_tier2             Int
+  base_fee_tier3             Int
+  estimated_duration_minutes Int      @default(60)
+  requires_certification     Boolean  @default(false)
+  checklist_template         Json
+  is_active                  Boolean  @default(true)
+  created_at                 DateTime @default(now())
+  updated_at                 DateTime @updatedAt
+
+  devices          Device[]
+  packages         ServicePackage[]
+  tickets          Ticket[]
+  commission_rules CommissionRule[]
+
+  @@map("service_categories")
+}
+
+model ServicePackage {
+  id                   String   @id @default(cuid())
+  service_category_id  String
+  name                 String
+  description          String?
+  price_customer       Int
+  fee_engineer         Int
+  estimated_duration   Int      @default(60)
+  checklist_template   Json?
+  required_engineers   Int      @default(1)
+  is_active            Boolean  @default(true)
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
+
+  service_category ServiceCategory @relation(fields: [service_category_id], references: [id], onDelete: Cascade)
+  tickets          Ticket[]
+
+  @@index([service_category_id])
+  @@map("service_packages")
+}
+
+model PartnershipAgreement {
+  id           String   @id @default(cuid())
+  version      String
+  title        String   @default("Perjanjian Kemitraan Mitra Teknisi FE-Track")
+  content_html String   @db.Text
+  is_active    Boolean  @default(false)
+  created_at   DateTime @default(now())
+  created_by   String?
+
+  engineer_agreements EngineerAgreement[]
+
+  @@map("partnership_agreements")
+}
+
+model EngineerAgreement {
+  id                String          @id @default(cuid())
+  engineer_id       String
+  agreement_id      String
+  status            AgreementStatus @default(PENDING)
+  signed_at         DateTime?
+  signature_data    String?         @db.Text
+  ip_address        String?
+  user_agent        String?
+  id_card_verified  Boolean         @default(false)
+  consent_text      String
+  created_at        DateTime        @default(now())
+
+  engineer  User                  @relation(fields: [engineer_id], references: [id], onDelete: Cascade)
+  agreement PartnershipAgreement  @relation(fields: [agreement_id], references: [id])
+
+  @@unique([engineer_id, agreement_id])
+  @@index([status])
+  @@index([engineer_id])
+  @@map("engineer_agreements")
+}
+
+model ComplianceLog {
+  id          String         @id @default(cuid())
+  engineer_id String
+  type        ComplianceType
+  ticket_id   String?
+  metadata    Json?
+  created_at  DateTime       @default(now())
+
+  engineer User @relation(fields: [engineer_id], references: [id], onDelete: Cascade)
+
+  @@index([engineer_id])
+  @@index([type])
+  @@index([created_at])
+  @@map("compliance_logs")
+}
+
+model AppNotification {
+  id         String    @id @default(cuid())
+  user_id    String
+  title      String
+  body       String
+  href       String?
+  /// TICKET_NEW | ESCALATE_L1 | ASSIGNED | STOP_CLOCK | ROUTING
+  type       String
+  ticket_id  String?
+  read_at    DateTime?
+  created_at DateTime  @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, read_at])
+  @@index([created_at])
+  @@map("app_notifications")
+}

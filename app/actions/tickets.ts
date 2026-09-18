@@ -1,0 +1,602 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { Prisma, Role, TicketStatus } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { auth, ADMIN_ROLES } from "@/lib/auth";
+import {
+  assignEngineerSchema,
+  createTicketSchema,
+  updateTicketStatusSchema,
+  type AssignEngineerInput,
+  type CreateTicketInput,
+  type UpdateTicketStatusInput,
+} from "@/lib/validations/tickets";
+import {
+  createTicketRecord,
+  resolveCreateTicketInput,
+  ticketDetailInclude,
+  ticketListInclude,
+} from "@/lib/tickets/service";
+
+type ActionResult<T = undefined> =
+  | { success: true; data?: T }
+  | { success: false; error: string };
+
+async function requireSession() {
+  const session = await auth();
+  if (!session?.user) throw new Error("Unauthorized");
+  return session;
+}
+
+async function requireAdmin() {
+  const session = await requireSession();
+  if (!(ADMIN_ROLES as readonly string[]).includes(session.user.role)) {
+    throw new Error("Unauthorized");
+  }
+  return session;
+}
+
+export async function getTickets(params: {
+  q?: string;
+  status?: string;
+  page?: number;
+  pageSize?: number;
+}) {
+  await requireAdmin();
+  const page = Math.max(1, params.page ?? 1);
+  const pageSize = Math.min(50, Math.max(5, params.pageSize ?? 15));
+  const q = params.q?.trim();
+
+  const where: Prisma.TicketWhereInput = {
+    AND: [
+      params.status ? { status: params.status as TicketStatus } : {},
+      q
+        ? {
+            OR: [
+              { ticket_no: { contains: q, mode: "insensitive" } },
+              { description: { contains: q, mode: "insensitive" } },
+              { tenant: { name: { contains: q, mode: "insensitive" } } },
+              { tenant: { code: { contains: q, mode: "insensitive" } } },
+            ],
+          }
+        : {},
+    ],
+  };
+
+  const [total, items] = await Promise.all([
+    prisma.ticket.count({ where }),
+    prisma.ticket.findMany({
+      where,
+      include: ticketListInclude,
+      orderBy: [{ created_at: "desc" }],
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+  ]);
+
+  return {
+    items,
+    total,
+    page,
+    pageSize,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  };
+}
+
+export async function getTicketById(id: string) {
+  await requireAdmin();
+  return prisma.ticket.findUnique({
+    where: { id },
+    include: ticketDetailInclude,
+  });
+}
+
+export async function getAssignableEngineers() {
+  await requireAdmin();
+  return prisma.user.findMany({
+    where: { role: Role.FIELD_ENGINEER },
+    select: {
+      id: true,
+      full_name: true,
+      phone: true,
+      status: true,
+      city: true,
+      skills: true,
+    },
+    orderBy: [{ status: "asc" }, { full_name: "asc" }],
+  });
+}
+
+export async function createTicketAction(
+  input: CreateTicketInput
+): Promise<ActionResult<{ id: string; ticket_no: string }>> {
+  try {
+    const session = await requireAdmin();
+    const parsed = createTicketSchema.parse(input);
+    const resolved = await resolveCreateTicketInput(parsed);
+    const ticket = await createTicketRecord({
+      ...resolved,
+      changed_by: session.user.id,
+    });
+
+    revalidatePath("/admin/tickets");
+    return {
+      success: true,
+      data: { id: ticket.id, ticket_no: ticket.ticket_no },
+    };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Gagal membuat ticket",
+    };
+  }
+}
+
+export async function updateTicketStatusAction(
+  input: UpdateTicketStatusInput
+): Promise<ActionResult> {
+  try {
+    const session = await requireSession();
+    const parsed = updateTicketStatusSchema.parse(input);
+
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: parsed.ticket_id },
+      include: { device: true },
+    });
+    if (!ticket) {
+      return { success: false, error: "Ticket tidak ditemukan" };
+    }
+
+    const isAdmin = (ADMIN_ROLES as readonly string[]).includes(session.user.role);
+    const isOwner =
+      session.user.role === Role.FIELD_ENGINEER &&
+      ticket.assigned_engineer_id === session.user.id;
+
+    if (!isAdmin && !isOwner) {
+      return { success: false, error: "Tidak berhak update ticket ini" };
+    }
+
+    if (session.user.role === Role.FIELD_ENGINEER) {
+      const eng = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { partnership_status: true },
+      });
+      if (eng?.partnership_status !== "SIGNED") {
+        return {
+          success: false,
+          error: "Anda harus tanda tangan perjanjian kemitraan dulu",
+        };
+      }
+    }
+
+    // Wajib checklist lengkap sebelum RESOLVED (khusus SDWAN & EDC dinamis)
+    if (
+      parsed.status === TicketStatus.RESOLVED &&
+      session.user.role === Role.FIELD_ENGINEER
+    ) {
+      const {
+        resolveChecklistKey,
+        isChecklistComplete,
+        isSdwanDevice,
+      } = await import("@/lib/checklists");
+      const key = resolveChecklistKey({
+        device_category: ticket.device?.device_category,
+        device_type: ticket.device?.type,
+        ticket_type: ticket.type,
+        description: ticket.description,
+      });
+      const raw = ticket.sdwan_checklist as
+        | { answers?: Record<string, { checked?: boolean; value?: string; photo_url?: string }> }
+        | null;
+      // SDWAN selalu wajib; EDC checklist juga jika ada device
+      if (isSdwanDevice(ticket.device?.device_category, ticket.device?.type) || ticket.device) {
+        const check = isChecklistComplete(key, raw?.answers);
+        if (!check.ok) {
+          return {
+            success: false,
+            error: `Checklist belum lengkap: ${check.missing.slice(0, 3).join(", ")}${check.missing.length > 3 ? "…" : ""}`,
+          };
+        }
+      }
+    }
+
+    const now = new Date();
+    const data: Prisma.TicketUpdateInput = {
+      status: parsed.status,
+    };
+
+    if (parsed.status === TicketStatus.ASSIGNED && !ticket.response_at) {
+      data.response_at = now;
+    }
+
+    // Engineer accept = keluar dari ASSIGNED (ON_THE_WAY dst) → stop re-dispatch cron
+    const acceptStatuses: TicketStatus[] = [
+      TicketStatus.ON_THE_WAY,
+      TicketStatus.ON_SITE,
+      TicketStatus.IN_PROGRESS,
+      TicketStatus.PENDING_SPAREPART,
+      TicketStatus.RESOLVED,
+      TicketStatus.CLOSED,
+    ];
+    if (
+      ticket.status === TicketStatus.ASSIGNED &&
+      acceptStatuses.includes(parsed.status) &&
+      !ticket.accepted_at
+    ) {
+      data.accepted_at = now;
+    }
+
+    if (
+      (parsed.status === TicketStatus.RESOLVED ||
+        parsed.status === TicketStatus.CLOSED) &&
+      !ticket.resolved_at
+    ) {
+      data.resolved_at = now;
+    }
+
+    // Engineer suspended tidak boleh resolve
+    if (
+      session.user.role === Role.FIELD_ENGINEER &&
+      (parsed.status === TicketStatus.RESOLVED ||
+        parsed.status === TicketStatus.CLOSED)
+    ) {
+      const eng = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { is_suspended: true },
+      });
+      if (eng?.is_suspended) {
+        return { success: false, error: "Akun kamu sedang di-suspend" };
+      }
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.ticket.update({
+        where: { id: ticket.id },
+        data,
+      });
+
+      await tx.ticketLog.create({
+        data: {
+          ticket_id: ticket.id,
+          status_from: ticket.status,
+          status_to: parsed.status,
+          changed_by: session.user.id,
+          notes:
+            parsed.notes ||
+            (data.accepted_at ? "Engineer accept ticket" : null),
+          lat: parsed.lat ?? null,
+          lng: parsed.lng ?? null,
+          photo_url: parsed.photo_url ?? [],
+          photo_hash: parsed.photo_hash ?? null,
+          exif_lat: parsed.exif_lat ?? null,
+          exif_lng: parsed.exif_lng ?? null,
+          exif_timestamp: parsed.exif_timestamp
+            ? new Date(parsed.exif_timestamp)
+            : null,
+        },
+      });
+    });
+
+    // Push status ke customer ITSM jika ticket dari Open API
+    void import("@/lib/webhook").then(({ triggerExternalWebhook }) =>
+      triggerExternalWebhook(ticket.id, parsed.status)
+    );
+
+    // Anti-fraud + komisi saat RESOLVED/CLOSED
+    if (
+      parsed.status === TicketStatus.RESOLVED ||
+      parsed.status === TicketStatus.CLOSED
+    ) {
+      void (async () => {
+        try {
+          const { runAntiFraudCheck } = await import("@/lib/antifraud");
+          const fraud = await runAntiFraudCheck(ticket.id);
+
+          if (fraud.hold_commission) {
+            await prisma.ticket.update({
+              where: { id: ticket.id },
+              data: { status: TicketStatus.PENDING_REVIEW },
+            });
+            await prisma.ticketLog.create({
+              data: {
+                ticket_id: ticket.id,
+                status_from: TicketStatus.RESOLVED,
+                status_to: TicketStatus.PENDING_REVIEW,
+                notes: `Anti-fraud hold: flags=${fraud.flags.join(",") || "-"} score=${fraud.score}. Komisi ditahan.`,
+                photo_url: [],
+              },
+            });
+            console.warn(
+              `[antifraud] Ticket ${ticket.ticket_no} → PENDING_REVIEW (hold commission)`
+            );
+            return;
+          }
+
+          const { processCommissionForTicket } = await import("@/lib/commission");
+          await processCommissionForTicket(ticket.id);
+
+          const { recalculateLeaderboard } = await import("@/lib/leaderboard");
+          void recalculateLeaderboard("month");
+          void recalculateLeaderboard("all_time");
+        } catch (e) {
+          console.error("[resolve antifraud/commission]", e);
+        }
+      })();
+    }
+
+    revalidatePath("/admin/tickets");
+    revalidatePath(`/admin/tickets/${ticket.id}`);
+    revalidatePath("/engineer/my-tickets");
+    revalidatePath(`/engineer/tickets/${ticket.id}`);
+    revalidatePath("/engineer/history");
+    revalidatePath("/engineer/wallet");
+    revalidatePath("/admin/payroll");
+    revalidatePath("/admin/fraud-center");
+    revalidatePath("/admin/leaderboard");
+    return { success: true };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Gagal update status",
+    };
+  }
+}
+
+export async function pauseSlaClockAction(input: {
+  ticket_id: string;
+  reason: string;
+}): Promise<ActionResult> {
+  try {
+    const session = await requireAdmin();
+    const reason = input.reason?.trim();
+    if (!reason || reason.length < 5) {
+      return { success: false, error: "Alasan stop clock minimal 5 karakter" };
+    }
+
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: input.ticket_id },
+    });
+    if (!ticket) return { success: false, error: "Ticket tidak ditemukan" };
+    if (!ticket.sla_due_at) {
+      return { success: false, error: "Ticket tidak punya SLA due" };
+    }
+    if (ticket.sla_paused_at) {
+      return { success: false, error: "SLA sudah di-pause" };
+    }
+    if (
+      ticket.status === TicketStatus.RESOLVED ||
+      ticket.status === TicketStatus.CLOSED
+    ) {
+      return { success: false, error: "Ticket sudah selesai" };
+    }
+
+    const now = new Date();
+    await prisma.$transaction(async (tx) => {
+      await tx.ticket.update({
+        where: { id: ticket.id },
+        data: {
+          sla_paused_at: now,
+          stop_clock_reason: reason,
+        },
+      });
+      await tx.ticketLog.create({
+        data: {
+          ticket_id: ticket.id,
+          status_from: ticket.status,
+          status_to: ticket.status,
+          changed_by: session.user.id,
+          notes: `STOP CLOCK: ${reason}`,
+          photo_url: [],
+        },
+      });
+    });
+
+    void import("@/lib/notifications").then(({ notifyStopClock }) =>
+      notifyStopClock({
+        id: ticket.id,
+        ticket_no: ticket.ticket_no,
+        paused: true,
+        reason,
+        engineerId: ticket.assigned_engineer_id,
+      })
+    );
+
+    revalidatePath("/admin/tickets");
+    revalidatePath(`/admin/tickets/${ticket.id}`);
+    revalidatePath("/admin/routing");
+    return { success: true };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Gagal stop clock",
+    };
+  }
+}
+
+export async function resumeSlaClockAction(input: {
+  ticket_id: string;
+  notes?: string | null;
+}): Promise<ActionResult> {
+  try {
+    const session = await requireAdmin();
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: input.ticket_id },
+    });
+    if (!ticket) return { success: false, error: "Ticket tidak ditemukan" };
+    if (!ticket.sla_paused_at || !ticket.sla_due_at) {
+      return { success: false, error: "Ticket tidak sedang di-pause" };
+    }
+
+    const { computeResumeSlaDueAt } = await import("@/lib/stop-clock");
+    const now = new Date();
+    const resumed = computeResumeSlaDueAt(ticket, now);
+    const pauseMin = Math.round(resumed.pause_ms / 60_000);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.ticket.update({
+        where: { id: ticket.id },
+        data: {
+          sla_due_at: resumed.sla_due_at,
+          sla_paused_at: null,
+          sla_paused_total_ms: resumed.sla_paused_total_ms,
+          stop_clock_reason: null,
+        },
+      });
+      await tx.ticketLog.create({
+        data: {
+          ticket_id: ticket.id,
+          status_from: ticket.status,
+          status_to: ticket.status,
+          changed_by: session.user.id,
+          notes:
+            input.notes?.trim() ||
+            `RESUME CLOCK: pause ${pauseMin} mnt, due digeser`,
+          photo_url: [],
+        },
+      });
+    });
+
+    void import("@/lib/notifications").then(({ notifyStopClock }) =>
+      notifyStopClock({
+        id: ticket.id,
+        ticket_no: ticket.ticket_no,
+        paused: false,
+        engineerId: ticket.assigned_engineer_id,
+      })
+    );
+
+    revalidatePath("/admin/tickets");
+    revalidatePath(`/admin/tickets/${ticket.id}`);
+    revalidatePath("/admin/routing");
+    return { success: true };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Gagal resume clock",
+    };
+  }
+}
+
+export async function assignEngineerAction(
+  input: AssignEngineerInput
+): Promise<ActionResult> {
+  try {
+    const session = await requireAdmin();
+    const parsed = assignEngineerSchema.parse(input);
+
+    const [ticket, engineer] = await Promise.all([
+      prisma.ticket.findUnique({
+        where: { id: parsed.ticket_id },
+        include: { device: true },
+      }),
+      prisma.user.findFirst({
+        where: { id: parsed.engineer_id, role: Role.FIELD_ENGINEER },
+      }),
+    ]);
+
+    if (!ticket) return { success: false, error: "Ticket tidak ditemukan" };
+    if (!engineer) return { success: false, error: "Engineer tidak ditemukan" };
+
+    const isSdwan =
+      ticket.device?.device_category === "ROUTER_SDWAN" ||
+      ticket.device?.type === "ROUTER_SDWAN";
+    if (isSdwan) {
+      const { filterSdwanEligibleEngineers } = await import("@/lib/dispatch");
+      const ok = await filterSdwanEligibleEngineers([engineer.id]);
+      if (ok.length === 0) {
+        return {
+          success: false,
+          error:
+            "Engineer belum eligible SDWAN (sertifikasi SDWAN + trust>85 + ≥20 ticket)",
+        };
+      }
+    }
+
+    const now = new Date();
+    const tried = Array.from(
+      new Set([...ticket.tried_engineer_ids, engineer.id])
+    );
+
+    await prisma.$transaction(async (tx) => {
+      if (
+        ticket.assigned_engineer_id &&
+        ticket.assigned_engineer_id !== engineer.id
+      ) {
+        await tx.user.update({
+          where: { id: ticket.assigned_engineer_id },
+          data: { status: "AVAILABLE" },
+        });
+      }
+
+      await tx.ticket.update({
+        where: { id: ticket.id },
+        data: {
+          assigned_engineer_id: engineer.id,
+          status: TicketStatus.ASSIGNED,
+          response_at: ticket.response_at ?? now,
+          last_assigned_at: now,
+          accepted_at: null,
+          dispatch_attempts: ticket.dispatch_attempts + 1,
+          tried_engineer_ids: tried,
+        },
+      });
+
+      await tx.user.update({
+        where: { id: engineer.id },
+        data: { status: "BUSY" },
+      });
+
+      await tx.ticketLog.create({
+        data: {
+          ticket_id: ticket.id,
+          status_from: ticket.status,
+          status_to: TicketStatus.ASSIGNED,
+          changed_by: session.user.id,
+          notes:
+            parsed.notes ||
+            `Manual assign ke ${engineer.full_name} (${engineer.phone})`,
+          photo_url: [],
+        },
+      });
+    });
+
+    // Notifikasi WA ke engineer
+    try {
+      const { sendWhatsApp, buildDispatchMessage } = await import("@/lib/whatsapp");
+      const full = await prisma.ticket.findUnique({
+        where: { id: ticket.id },
+        include: { tenant: true },
+      });
+      if (full) {
+        await sendWhatsApp({
+          phone: engineer.phone,
+          message: buildDispatchMessage(full.ticket_no, full.tenant.name),
+        });
+        void import("@/lib/notifications").then(({ notifyAssigned }) =>
+          notifyAssigned(engineer.id, {
+            id: full.id,
+            ticket_no: full.ticket_no,
+            tenantName: full.tenant.name,
+          })
+        );
+      }
+    } catch (e) {
+      console.error("[assign] WA gagal:", e);
+    }
+
+    void import("@/lib/webhook").then(({ triggerExternalWebhook }) =>
+      triggerExternalWebhook(ticket.id, TicketStatus.ASSIGNED)
+    );
+
+    revalidatePath("/admin/tickets");
+    revalidatePath(`/admin/tickets/${ticket.id}`);
+    revalidatePath("/admin/engineers");
+    return { success: true };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Gagal assign engineer",
+    };
+  }
+}
