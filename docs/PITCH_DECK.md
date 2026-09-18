@@ -6,6 +6,8 @@
 **Satu kalimat positioning:**  
 > *SLA Field Ops OS* — marketplace + NOC yang membuat jaringan toko nasional bisa dijamin 99% uptime.
 
+**Outline visual interaktif (Canvas):** buka `pitch-deck-visual-outline` di panel Canvas Cursor — navigator 18 slide + Act A–E + speaker notes.
+
 Gunakan file ini sebagai **script slide-by-slide** (PowerPoint / Pitch / Google Slides).  
 Setiap slide: **headline kuat** + **1 visual** + **speaker note**.
 
