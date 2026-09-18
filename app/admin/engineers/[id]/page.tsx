@@ -54,6 +54,15 @@ export default async function EngineerDetailPage({ params }: PageProps) {
               {engineer.status}
             </Badge>
             <Badge variant="outline">Rating {engineer.rating.toFixed(1)}</Badge>
+            <Badge variant="outline">
+              {engineer.engagement_type === "MITRA"
+                ? "Mitra"
+                : engineer.engagement_type === "PKWT_OUTTASK"
+                  ? "PKWT Outtask"
+                  : engineer.engagement_type === "PKWT_INTERNAL"
+                    ? "PKWT Internal"
+                    : engineer.engagement_type}
+            </Badge>
             <Badge
               variant={
                 engineer.partnership_status === "SIGNED" ? "success" : "warning"
@@ -86,6 +95,11 @@ export default async function EngineerDetailPage({ params }: PageProps) {
           <Button asChild size="sm" variant="outline" className="mt-3">
             <Link href={`/admin/engineers/${engineer.id}/certifications`}>
               Kelola Sertifikasi SDWAN
+            </Link>
+          </Button>
+          <Button asChild size="sm" variant="outline" className="mt-3 ml-2">
+            <Link href={`/admin/engineers/${engineer.id}/contracts`}>
+              Kelola Kontrak PKWT
             </Link>
           </Button>
         </div>

@@ -45,17 +45,31 @@ export const authConfig = {
         token.partnership_status =
           (user as { partnership_status?: string }).partnership_status ??
           "NOT_SIGNED";
+        token.engagement_type =
+          (user as { engagement_type?: string }).engagement_type ?? "MITRA";
       }
-      // Refresh partnership dari DB saja — JANGAN percaya payload client
-      // (session.update({ partnership_status: "SIGNED" }) tidak boleh bypass gate)
-      if (trigger === "update" && token.id) {
-        const { prisma } = await import("@/lib/prisma");
-        const row = await prisma.user.findUnique({
-          where: { id: token.id as string },
-          select: { partnership_status: true },
-        });
-        if (row) {
-          token.partnership_status = row.partnership_status;
+
+      // Sync partnership dari DB saat login / session.update().
+      // Jangan query Prisma di setiap request (middleware Edge tidak support Prisma).
+      // Stale JWT (NOT_SIGNED) ditangani SyncPartnershipRedirect di /engineer/agreement.
+      if ((trigger === "update" || trigger === "signIn") && token.id) {
+        try {
+          const { prisma } = await import("@/lib/prisma");
+          const row = await prisma.user.findUnique({
+            where: { id: token.id as string },
+            select: {
+              partnership_status: true,
+              engagement_type: true,
+              role: true,
+            },
+          });
+          if (row) {
+            token.partnership_status = row.partnership_status;
+            token.engagement_type = row.engagement_type;
+            token.role = row.role;
+          }
+        } catch {
+          // biarkan token lama
         }
       }
       return token;
@@ -67,6 +81,8 @@ export const authConfig = {
         session.user.phone = token.phone as string;
         session.user.partnership_status = (token.partnership_status as string) ??
           "NOT_SIGNED";
+        session.user.engagement_type =
+          (token.engagement_type as string) ?? "MITRA";
       }
       return session;
     },
@@ -74,9 +90,6 @@ export const authConfig = {
       const { pathname } = request.nextUrl;
       const isLoggedIn = !!auth?.user;
       const role = auth?.user?.role as string | undefined;
-      const partnership =
-        (auth?.user as { partnership_status?: string } | undefined)
-          ?.partnership_status ?? "NOT_SIGNED";
 
       if (pathname.startsWith("/login")) {
         if (!isLoggedIn) return true;
@@ -84,11 +97,7 @@ export const authConfig = {
           return Response.redirect(new URL("/admin/dashboard", request.url));
         }
         if (role === "FIELD_ENGINEER") {
-          if (partnership !== "SIGNED") {
-            return Response.redirect(
-              new URL("/engineer/agreement", request.url)
-            );
-          }
+          // Prefer tickets; layout DB akan kirim ke agreement jika belum signed
           return Response.redirect(
             new URL("/engineer/my-tickets", request.url)
           );
@@ -115,16 +124,7 @@ export const authConfig = {
         if (role !== "FIELD_ENGINEER") {
           return Response.redirect(new URL("/admin/dashboard", request.url));
         }
-        // Gate kemitraan: semua route engineer kecuali /agreement
-        if (
-          partnership !== "SIGNED" &&
-          !pathname.startsWith("/engineer/agreement")
-        ) {
-          return Response.redirect(
-            new URL("/engineer/agreement", request.url)
-          );
-        }
-        // Signed user boleh akses ?view=1 di agreement
+        // Partnership gate → app/engineer/layout.tsx (DB), bukan JWT di Edge
         return true;
       }
 

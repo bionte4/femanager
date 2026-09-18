@@ -1,5 +1,6 @@
 import {
   DeviceType,
+  EngagementType,
   SlaTier,
   TicketStatus,
   TicketType,
@@ -245,7 +246,14 @@ export async function processCommissionForTicket(ticketId: string): Promise<{
         service_package: {
           select: { id: true, name: true, fee_engineer: true },
         },
-        assigned_engineer: { select: { id: true, phone: true, full_name: true } },
+        assigned_engineer: {
+          select: {
+            id: true,
+            phone: true,
+            full_name: true,
+            engagement_type: true,
+          },
+        },
       },
     });
 
@@ -264,6 +272,11 @@ export async function processCommissionForTicket(ticketId: string): Promise<{
 
     if (!ticket.assigned_engineer_id || !ticket.assigned_engineer) {
       return { success: false, error: "Tidak ada engineer assigned" };
+    }
+
+    // PKWT / non-MITRA: isolasi wallet — tidak ada komisi ticket
+    if (ticket.assigned_engineer.engagement_type !== EngagementType.MITRA) {
+      return { success: true, skipped: true, total: 0 };
     }
 
     const breakdown = await calculateCommission(ticket);

@@ -5,13 +5,16 @@ import { revalidatePath } from "next/cache";
 import {
   ComplianceType,
   EngineerStatus,
-  PartnershipStatus,
   TicketStatus,
 } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { logCompliance } from "@/app/actions/legal";
 import { autoDispatchTicket } from "@/lib/dispatch";
+import {
+  eligibleForWork,
+  eligibilityMessage,
+} from "@/lib/eligibility";
 
 const REJECT_REASONS = [
   "Jauh dari lokasi",
@@ -24,7 +27,7 @@ const REJECT_REASONS = [
 
 export { REJECT_REASONS };
 
-async function requireSignedEngineer() {
+async function requireEligibleEngineer() {
   const session = await auth();
   if (!session?.user) throw new Error("Unauthorized");
 
@@ -32,14 +35,15 @@ async function requireSignedEngineer() {
     where: { id: session.user.id },
     select: {
       id: true,
-      partnership_status: true,
       trust_score: true,
       role: true,
     },
   });
   if (!user) throw new Error("Unauthorized");
-  if (user.partnership_status !== PartnershipStatus.SIGNED) {
-    throw new Error("Anda harus tanda tangan perjanjian kemitraan dulu");
+
+  const elig = await eligibleForWork(user.id);
+  if (!elig.ok) {
+    throw new Error(eligibilityMessage(elig.reason));
   }
   return user;
 }
@@ -48,7 +52,7 @@ export async function acceptJobAction(
   ticketId: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const user = await requireSignedEngineer();
+    const user = await requireEligibleEngineer();
     const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
     if (!ticket) return { success: false, error: "Ticket tidak ditemukan" };
     if (ticket.assigned_engineer_id !== user.id) {
@@ -108,7 +112,7 @@ export async function rejectJobAction(input: {
   notes?: string;
 }): Promise<{ success: boolean; error?: string }> {
   try {
-    const user = await requireSignedEngineer();
+    const user = await requireEligibleEngineer();
     const ticket = await prisma.ticket.findUnique({
       where: { id: input.ticket_id },
     });

@@ -1,15 +1,14 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState, type ComponentType, type Ref, type CanvasHTMLAttributes } from "react";
 import { useSession } from "next-auth/react";
-import SignatureCanvas from "react-signature-canvas";
 import { toast } from "sonner";
 import { signPartnershipAgreementAction } from "@/app/actions/legal";
 import { PARTNERSHIP_CONSENT_TEXT } from "@/lib/legal/agreement-template";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { EngineerLogoutButton } from "@/components/engineer/logout-button";
 
 type Props = {
   contentHtml: string;
@@ -19,6 +18,22 @@ type Props = {
   version: string;
 };
 
+type SigPad = {
+  clear: () => void;
+  isEmpty: () => boolean;
+  toDataURL: (type?: string) => string;
+};
+
+type SigProps = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ref?: Ref<any>;
+  canvasProps?: CanvasHTMLAttributes<HTMLCanvasElement>;
+  backgroundColor?: string;
+};
+
+/**
+ * Form perjanjian — SignatureCanvas di-load setelah mount (hindari blank SSR).
+ */
 export function AgreementSignForm({
   contentHtml,
   engineerName,
@@ -26,17 +41,31 @@ export function AgreementSignForm({
   toolsOwned,
   version,
 }: Props) {
-  const router = useRouter();
   const { update } = useSession();
-  const sigRef = useRef<SignatureCanvas>(null);
+  const sigRef = useRef<SigPad | null>(null);
   const [consent, setConsent] = useState(false);
-  const [pending, startTransition] = useTransition();
+  const [pending, setPending] = useState(false);
+  const [SigComponent, setSigComponent] = useState<ComponentType<SigProps> | null>(
+    null
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    void import("react-signature-canvas").then((mod) => {
+      if (!cancelled) {
+        setSigComponent(() => mod.default as unknown as ComponentType<SigProps>);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function clearSig() {
     sigRef.current?.clear();
   }
 
-  function submit() {
+  async function submit() {
     if (!consent) {
       toast.error("Centang persetujuan dulu");
       return;
@@ -46,7 +75,8 @@ export function AgreementSignForm({
       return;
     }
     const dataUrl = sigRef.current.toDataURL("image/png");
-    startTransition(async () => {
+    setPending(true);
+    try {
       const res = await signPartnershipAgreementAction({
         signature_data: dataUrl,
         consent_checked: true,
@@ -55,11 +85,18 @@ export function AgreementSignForm({
         toast.error(res.error);
         return;
       }
-      await update();
+      try {
+        await update();
+      } catch {
+        // JWT sync opsional — hard nav tetap jalan
+      }
       toast.success("Perjanjian ditandatangani");
-      router.replace("/engineer/my-tickets");
-      router.refresh();
-    });
+      window.location.replace("/engineer/my-tickets");
+    } catch {
+      toast.error("Gagal menyimpan perjanjian");
+    } finally {
+      setPending(false);
+    }
   }
 
   return (
@@ -83,15 +120,21 @@ export function AgreementSignForm({
       <div className="space-y-2">
         <Label>Tanda tangan digital</Label>
         <div className="overflow-hidden rounded-xl border bg-white">
-          <SignatureCanvas
-            ref={sigRef}
-            canvasProps={{
-              className: "w-full h-40 touch-none",
-              width: 500,
-              height: 160,
-            }}
-            backgroundColor="#ffffff"
-          />
+          {SigComponent ? (
+            <SigComponent
+              ref={sigRef}
+              canvasProps={{
+                className: "h-40 w-full touch-none",
+                width: 500,
+                height: 160,
+              }}
+              backgroundColor="#ffffff"
+            />
+          ) : (
+            <div className="flex h-40 items-center justify-center text-xs text-muted-foreground">
+              Memuat pad tanda tangan…
+            </div>
+          )}
         </div>
         <Button type="button" variant="ghost" size="sm" onClick={clearSig}>
           Hapus tanda tangan
@@ -107,15 +150,26 @@ export function AgreementSignForm({
         <span className="text-sm leading-snug">{PARTNERSHIP_CONSENT_TEXT}</span>
       </label>
 
-      <Button
-        type="button"
-        size="lg"
-        className="h-14 w-full text-base"
-        disabled={pending}
-        onClick={submit}
-      >
-        Tanda Tangan &amp; Setuju
-      </Button>
+      <div className="flex flex-col gap-2">
+        <Button
+          type="button"
+          size="lg"
+          className="h-14 w-full text-base"
+          disabled={pending || !SigComponent}
+          onClick={() => void submit()}
+        >
+          {pending ? "Menyimpan…" : "Tanda Tangan & Setuju"}
+        </Button>
+        <EngineerLogoutButton
+          label="Keluar / ganti akun"
+          variant="outline"
+          className="h-11 w-full"
+        />
+        <p className="text-center text-[11px] text-muted-foreground">
+          Perjanjian wajib sebelum ambil job. Belum siap tanda tangan? Keluar
+          dulu, login lagi nanti.
+        </p>
+      </div>
     </div>
   );
 }

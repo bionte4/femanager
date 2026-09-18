@@ -50,6 +50,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           phone: user.phone,
           role: user.role,
           partnership_status: user.partnership_status,
+          engagement_type: user.engagement_type,
         };
       },
     }),

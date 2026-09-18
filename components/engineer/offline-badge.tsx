@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 
 export function OfflineBadge() {
   const {
+    hydrated,
     online,
     pendingCount,
     conflictCount,
@@ -14,6 +15,8 @@ export function OfflineBadge() {
     discardAllConflicts,
   } = useOfflineSync();
 
+  // Hindari hydration mismatch (SSR vs navigator.onLine / IndexedDB queue)
+  if (!hydrated) return null;
   if (online && pendingCount === 0 && conflictCount === 0) return null;
 
   return (

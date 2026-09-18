@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, FileText, Video } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { KbArticleBody } from "@/components/kb/kb-article-body";
 
 type PageProps = {
   params: Promise<{ id: string }> | { id: string };
@@ -17,37 +18,49 @@ export default async function EngineerKbDetailPage({ params }: PageProps) {
   if (!kb) notFound();
 
   return (
-    <div className="mx-auto max-w-lg space-y-4 px-4 py-4 pb-24">
-      <Button variant="ghost" size="sm" asChild className="-ml-2">
+    <div className="space-y-2.5 pb-2">
+      <Button variant="ghost" size="sm" asChild className="-ml-2 h-8 px-2 text-xs">
         <Link href="/engineer/kb">
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft className="h-3.5 w-3.5" />
           Kembali
         </Link>
       </Button>
-      <Badge>{kb.category}</Badge>
-      <h1 className="text-2xl font-bold">{kb.title}</h1>
-      <article className="whitespace-pre-wrap rounded-xl border bg-card p-4 text-sm leading-relaxed">
-        {kb.content}
+      <div className="space-y-1">
+        <Badge className="px-1.5 py-0 text-[10px] font-medium leading-snug">
+          {kb.category}
+        </Badge>
+        <h1 className="text-lg font-semibold leading-snug tracking-tight">
+          {kb.title}
+        </h1>
+      </div>
+      <article className="rounded-lg border bg-card px-3 py-2.5">
+        <KbArticleBody content={kb.content} />
       </article>
-      {kb.video_url && (
-        <a
-          href={kb.video_url}
-          target="_blank"
-          rel="noreferrer"
-          className="block text-sm text-primary underline"
-        >
-          Tonton video YouTube →
-        </a>
-      )}
-      {kb.file_url && (
-        <a
-          href={kb.file_url}
-          target="_blank"
-          rel="noreferrer"
-          className="block text-sm text-primary underline"
-        >
-          Download PDF SOP →
-        </a>
+      {(kb.video_url || kb.file_url) && (
+        <div className="flex flex-col gap-1.5">
+          {kb.video_url && (
+            <a
+              href={kb.video_url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+            >
+              <Video className="h-3.5 w-3.5" />
+              Tonton video
+            </a>
+          )}
+          {kb.file_url && (
+            <a
+              href={kb.file_url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+            >
+              <FileText className="h-3.5 w-3.5" />
+              Download PDF SOP
+            </a>
+          )}
+        </div>
       )}
     </div>
   );

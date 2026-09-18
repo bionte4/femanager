@@ -25,11 +25,12 @@ export function SLACountdown({
   className,
   compact,
 }: SLACountdownProps) {
-  const [now, setNow] = useState(() => Date.now());
+  const [now, setNow] = useState<number | null>(null);
 
   const isPaused = !!pausedAt;
 
   useEffect(() => {
+    setNow(Date.now());
     if (isPaused) return;
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
@@ -38,6 +39,22 @@ export function SLACountdown({
   if (!dueAt) {
     return (
       <span className={cn("text-xs text-muted-foreground", className)}>—</span>
+    );
+  }
+
+  // SSR + paint pertama: placeholder stabil (hindari hydration mismatch Date.now)
+  if (now === null) {
+    return (
+      <span
+        className={cn(
+          "inline-flex items-center gap-1 rounded-md px-2 py-1 font-mono text-xs font-semibold tabular-nums bg-muted text-muted-foreground",
+          compact && "px-1.5 py-0.5",
+          className
+        )}
+        suppressHydrationWarning
+      >
+        …
+      </span>
     );
   }
 

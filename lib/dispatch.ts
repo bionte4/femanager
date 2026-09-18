@@ -1,7 +1,6 @@
 import {
   DeviceType,
   EngineerStatus,
-  Role,
   TicketStatus,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -17,6 +16,7 @@ import {
   getActiveCertifiedEngineerIds,
   skillAliasesForCategory,
 } from "@/lib/skill-match";
+import { dispatchEligibleWhere } from "@/lib/contracts";
 
 export { categoryCodeForDeviceType } from "@/lib/skill-match";
 
@@ -77,9 +77,8 @@ export async function findNearbyEngineers(
 
   const engineers = await prisma.user.findMany({
     where: {
-      role: Role.FIELD_ENGINEER,
+      ...dispatchEligibleWhere(),
       status: EngineerStatus.AVAILABLE,
-      is_suspended: false,
       is_coordinator: false,
       lat: { not: null },
       lng: { not: null },

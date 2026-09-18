@@ -90,6 +90,8 @@ export async function getEngineerPerformance(engineerId: string) {
       status: engineer.status,
       rating: engineer.rating,
       partnership_status: engineer.partnership_status,
+      engagement_type: engineer.engagement_type,
+      employment_status: engineer.employment_status,
       can_work_for_others: engineer.can_work_for_others,
       tools_owned: Array.isArray(engineer.tools_owned)
         ? (engineer.tools_owned as string[])

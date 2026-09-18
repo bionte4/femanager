@@ -156,6 +156,34 @@ enum PartnershipStatus {
   EXPIRED
 }
 
+/// Tipe engagement FE: Mitra (komisi) vs karyawan PKWT (payroll)
+enum EngagementType {
+  MITRA
+  PKWT_OUTTASK
+  PKWT_INTERNAL
+}
+
+/// Status hubungan kerja — hanya relevan untuk PKWT_*
+enum EmploymentStatus {
+  NONE
+  ACTIVE
+  SUSPENDED
+  ENDED
+}
+
+enum EngineerContractType {
+  PKWT_OUTTASK
+  PKWT_INTERNAL
+}
+
+enum EngineerContractStatus {
+  DRAFT
+  ACTIVE
+  SUSPENDED
+  ENDED
+  EXPIRED
+}
+
 // ==================== MODELS ====================
 
 model User {
@@ -181,6 +209,11 @@ model User {
   has_toolkit    Boolean       @default(false)
   has_car        Boolean       @default(false)
   partnership_status PartnershipStatus @default(NOT_SIGNED)
+  /// Default MITRA agar FE existing tetap kompatibel
+  engagement_type    EngagementType   @default(MITRA)
+  employment_status  EmploymentStatus @default(NONE)
+  employer_name      String?
+  employee_no        String?
   /// ["motorcycle", "toolkit", "laptop", "bor", "tangga", "car"]
   tools_owned    Json?
   can_work_for_others Boolean  @default(true)
@@ -202,6 +235,8 @@ model User {
   notifications    AppNotification[]
   push_tokens      PushDeviceToken[]
   sparepart_mutations SparepartMutation[]
+  engineer_contracts  EngineerContract[]
+  engagement_changes  EngagementChangeLog[]
 
   @@map("users")
 }
@@ -811,4 +846,45 @@ model WebhookDeadLetter {
   @@index([integration_id])
   @@index([created_at])
   @@map("webhook_dead_letters")
+}
+
+/// Kontrak kerja PKWT (outtask / internal) — terpisah dari perjanjian kemitraan
+model EngineerContract {
+  id                   String                 @id @default(cuid())
+  user_id              String
+  type                 EngineerContractType
+  status               EngineerContractStatus @default(DRAFT)
+  start_at             DateTime
+  end_at               DateTime
+  client_label         String?
+  placement_cities     String[]               @default([])
+  placement_tenant_ids String[]               @default([])
+  document_url         String?
+  notes                String?
+  created_by           String?
+  created_at           DateTime               @default(now())
+  updated_at           DateTime               @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, status])
+  @@index([end_at])
+  @@index([status, end_at])
+  @@map("engineer_contracts")
+}
+
+/// Audit ganti engagement MITRA ↔ PKWT
+model EngagementChangeLog {
+  id         String         @id @default(cuid())
+  user_id    String
+  from_type  EngagementType
+  to_type    EngagementType
+  reason     String?
+  changed_by String?
+  created_at DateTime       @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, created_at])
+  @@map("engagement_change_logs")
 }

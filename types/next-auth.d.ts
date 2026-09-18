@@ -7,6 +7,7 @@ declare module "next-auth" {
     phone: string;
     role: Role;
     partnership_status?: string;
+    engagement_type?: string;
   }
 
   interface Session {
@@ -15,6 +16,7 @@ declare module "next-auth" {
       phone: string;
       role: Role;
       partnership_status?: string;
+      engagement_type?: string;
     } & DefaultSession["user"];
   }
 }
@@ -25,5 +27,6 @@ declare module "next-auth/jwt" {
     phone: string;
     role: Role;
     partnership_status?: string;
+    engagement_type?: string;
   }
 }

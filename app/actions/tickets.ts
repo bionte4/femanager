@@ -191,14 +191,14 @@ export async function updateTicketStatusAction(
     }
 
     if (session.user.role === Role.FIELD_ENGINEER) {
-      const eng = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: { partnership_status: true },
-      });
-      if (eng?.partnership_status !== "SIGNED") {
+      const { eligibleForWork, eligibilityMessage } = await import(
+        "@/lib/eligibility"
+      );
+      const elig = await eligibleForWork(session.user.id);
+      if (!elig.ok) {
         return {
           success: false,
-          error: "Anda harus tanda tangan perjanjian kemitraan dulu",
+          error: eligibilityMessage(elig.reason),
         };
       }
     }

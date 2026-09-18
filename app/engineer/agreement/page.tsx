@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { PartnershipStatus } from "@prisma/client";
 import { auth } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import { getActiveAgreementForEngineer } from "@/app/actions/legal";
 import { AgreementSignForm } from "@/components/engineer/agreement-sign-form";
 import { DownloadAgreementPdfButton } from "@/components/engineer/download-agreement-pdf";
+import { HardRedirect } from "@/components/engineer/hard-redirect";
 import { Button } from "@/components/ui/button";
 
 function toolsFromUser(user: {
@@ -37,21 +38,18 @@ export default async function EngineerAgreementPage({ searchParams }: PageProps)
   const data = await getActiveAgreementForEngineer(session.user.id);
   if (!data) redirect("/login");
 
-  const alreadySigned =
-    data.user.partnership_status === PartnershipStatus.SIGNED &&
-    data.engineerAgreement?.status === "SIGNED";
+  const userSigned = data.user.partnership_status === PartnershipStatus.SIGNED;
 
-  if (alreadySigned && !viewOnly) {
-    // Default: signed users going to /agreement without ?view=1 → tickets
-    // Profile pakai ?view=1 untuk baca ulang
-    redirect("/engineer/my-tickets");
+  // Sudah mitra aktif → hard redirect (soft RSC redirect sering nyangkut blank di FE)
+  if (userSigned && !viewOnly) {
+    return <HardRedirect href="/engineer/my-tickets" />;
   }
 
   if (!data.agreement) {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-bold">Perjanjian Kemitraan</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-xl font-semibold tracking-tight">Perjanjian Kemitraan</h1>
+        <p className="text-sm text-muted-foreground">
           Belum ada template perjanjian aktif. Hubungi admin.
         </p>
       </div>
@@ -63,13 +61,17 @@ export default async function EngineerAgreementPage({ searchParams }: PageProps)
     .replaceAll("{{ENGINEER_ID}}", data.user.id.slice(-8).toUpperCase())
     .replaceAll("{{YEAR}}", String(year));
 
-  if (alreadySigned && viewOnly && data.engineerAgreement) {
+  if (
+    userSigned &&
+    viewOnly &&
+    data.engineerAgreement?.status === "SIGNED"
+  ) {
     return (
       <div className="space-y-4">
         <Button variant="ghost" size="sm" asChild className="-ml-2">
           <Link href="/engineer/profile">← Kembali</Link>
         </Button>
-        <h1 className="text-2xl font-bold tracking-tight">
+        <h1 className="text-xl font-semibold tracking-tight">
           Perjanjian Kemitraan (Read-only)
         </h1>
         <div
@@ -100,7 +102,7 @@ export default async function EngineerAgreementPage({ searchParams }: PageProps)
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">
+        <h1 className="text-xl font-semibold tracking-tight">
           Perjanjian Kemitraan
         </h1>
         <p className="text-sm text-muted-foreground">

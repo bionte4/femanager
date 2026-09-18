@@ -191,9 +191,9 @@ async function syncOne(action: OfflineAction): Promise<{
 export function useOfflineSync() {
   const [pending, setPending] = useState<OfflineAction[]>([]);
   const [conflicts, setConflicts] = useState<OfflineAction[]>([]);
-  const [online, setOnline] = useState(
-    typeof navigator !== "undefined" ? navigator.onLine : true
-  );
+  // Selalu true di SSR + paint pertama — navigator.onLine beda bikin hydration error
+  const [online, setOnline] = useState(true);
+  const [hydrated, setHydrated] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [lastResult, setLastResult] = useState<SyncResult | null>(null);
   const syncingRef = useRef(false);
@@ -302,6 +302,8 @@ export function useOfflineSync() {
   }, [refresh, lastResult]);
 
   useEffect(() => {
+    setHydrated(true);
+    setOnline(typeof navigator !== "undefined" ? navigator.onLine : true);
     void refresh();
 
     function onOnline() {
@@ -322,6 +324,7 @@ export function useOfflineSync() {
 
   return {
     online,
+    hydrated,
     pending,
     conflicts,
     pendingCount: pending.length,

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import {
   AgreementStatus,
   ComplianceType,
+  EngagementType,
   PartnershipStatus,
   Prisma,
 } from "@prisma/client";
@@ -60,6 +61,7 @@ export async function getActiveAgreementForEngineer(engineerId: string) {
       phone: true,
       city: true,
       partnership_status: true,
+      engagement_type: true,
       tools_owned: true,
       can_work_for_others: true,
       has_motorcycle: true,
@@ -68,6 +70,11 @@ export async function getActiveAgreementForEngineer(engineerId: string) {
     },
   });
   if (!user) return null;
+
+  // PKWT tidak memakai perjanjian kemitraan
+  if (user.engagement_type !== EngagementType.MITRA) {
+    return { user, agreement: null, engineerAgreement: null };
+  }
 
   const active = await prisma.partnershipAgreement.findFirst({
     where: { is_active: true },
@@ -84,7 +91,8 @@ export async function getActiveAgreementForEngineer(engineerId: string) {
     include: { agreement: true },
   });
 
-  if (!ea) {
+  // Jangan auto-create PENDING jika user sudah SIGNED (bikin UI agreement "aneh"/blank path)
+  if (!ea && user.partnership_status !== PartnershipStatus.SIGNED) {
     ea = await prisma.engineerAgreement.create({
       data: {
         engineer_id: engineerId,
@@ -122,6 +130,12 @@ export async function signPartnershipAgreementAction(input: {
     const ua = h.get("user-agent") || "unknown";
 
     const data = await getActiveAgreementForEngineer(session.user.id);
+    if (data?.user && data.user.engagement_type !== EngagementType.MITRA) {
+      return {
+        success: false,
+        error: "Perjanjian kemitraan hanya untuk Mitra, bukan karyawan PKWT",
+      };
+    }
     if (!data?.agreement || !data.engineerAgreement) {
       return { success: false, error: "Tidak ada perjanjian aktif" };
     }

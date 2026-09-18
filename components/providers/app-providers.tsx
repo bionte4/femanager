@@ -19,7 +19,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <SessionProvider>
+    <SessionProvider refetchInterval={5 * 60} refetchOnWindowFocus={false}>
       <QueryClientProvider client={queryClient}>
         {children}
         <Toaster richColors position="top-center" closeButton />

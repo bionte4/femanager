@@ -1,0 +1,143 @@
+import { type EngagementType, type Prisma } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+
+export type ExpireContractsResult = {
+  expired_count: number;
+  employment_ended_count: number;
+  contract_ids: string[];
+};
+
+/**
+ * Cron harian: kontrak ACTIVE dengan end_at < now → EXPIRED.
+ * Jika user tidak punya kontrak ACTIVE lain → employment_status = ENDED.
+ */
+export async function expireEngineerContracts(): Promise<ExpireContractsResult> {
+  const now = new Date();
+
+  const due = await prisma.engineerContract.findMany({
+    where: {
+      status: "ACTIVE",
+      end_at: { lt: now },
+    },
+    select: { id: true, user_id: true },
+  });
+
+  if (due.length === 0) {
+    return {
+      expired_count: 0,
+      employment_ended_count: 0,
+      contract_ids: [],
+    };
+  }
+
+  const contractIds = due.map((c) => c.id);
+  const userIds = Array.from(new Set(due.map((c) => c.user_id)));
+
+  await prisma.engineerContract.updateMany({
+    where: { id: { in: contractIds } },
+    data: { status: "EXPIRED" },
+  });
+
+  let employmentEnded = 0;
+  for (const userId of userIds) {
+    const stillActive = await prisma.engineerContract.findFirst({
+      where: {
+        user_id: userId,
+        status: "ACTIVE",
+        end_at: { gte: now },
+      },
+      select: { id: true },
+    });
+    if (stillActive) continue;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { engagement_type: true, employment_status: true },
+    });
+    if (!user) continue;
+    if (user.engagement_type === "MITRA" || user.employment_status === "ENDED") {
+      continue;
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { employment_status: "ENDED" },
+    });
+    employmentEnded += 1;
+  }
+
+  return {
+    expired_count: contractIds.length,
+    employment_ended_count: employmentEnded,
+    contract_ids: contractIds,
+  };
+}
+
+export async function listExpiringContracts(withinDays = 30) {
+  const now = new Date();
+  const until = new Date(now.getTime() + withinDays * 24 * 60 * 60 * 1000);
+
+  return prisma.engineerContract.findMany({
+    where: {
+      status: "ACTIVE",
+      end_at: { gte: now, lte: until },
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          full_name: true,
+          phone: true,
+          city: true,
+          engagement_type: true,
+          employment_status: true,
+        },
+      },
+    },
+    orderBy: { end_at: "asc" },
+  });
+}
+
+export function contractTypeToEngagement(
+  type: "PKWT_OUTTASK" | "PKWT_INTERNAL" | string
+): EngagementType {
+  return type === "PKWT_INTERNAL" ? "PKWT_INTERNAL" : "PKWT_OUTTASK";
+}
+
+export function parseCities(raw: string | string[] | undefined): string[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) {
+    return raw.map((c) => c.trim()).filter(Boolean);
+  }
+  return raw
+    .split(/[,;\n]/)
+    .map((c) => c.trim())
+    .filter(Boolean);
+}
+
+/** Prisma where: FE eligible untuk dispatch (Mitra signed ATAU PKWT + kontrak aktif) */
+export function dispatchEligibleWhere(
+  now = new Date()
+): Prisma.UserWhereInput {
+  return {
+    role: "FIELD_ENGINEER",
+    is_suspended: false,
+    OR: [
+      {
+        engagement_type: "MITRA",
+        partnership_status: "SIGNED",
+      },
+      {
+        engagement_type: { in: ["PKWT_OUTTASK", "PKWT_INTERNAL"] },
+        employment_status: "ACTIVE",
+        engineer_contracts: {
+          some: {
+            status: "ACTIVE",
+            start_at: { lte: now },
+            end_at: { gte: now },
+          },
+        },
+      },
+    ],
+  };
+}

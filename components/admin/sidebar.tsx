@@ -26,6 +26,7 @@ import {
   LogOut,
   Menu,
   X,
+  FileText,
   type LucideIcon,
 } from "lucide-react";
 import { useState } from "react";
@@ -72,6 +73,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Mitra",
     items: [
       { href: "/admin/engineers", label: "Engineers", icon: HardHat },
+      { href: "/admin/hr/contracts", label: "Kontrak PKWT", icon: FileText },
       { href: "/admin/recruitment", label: "Recruitment", icon: UserPlus },
       { href: "/admin/leaderboard", label: "Leaderboard", icon: Trophy },
       { href: "/admin/legal", label: "Legal", icon: Scale },
