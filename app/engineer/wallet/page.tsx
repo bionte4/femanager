@@ -57,6 +57,7 @@ export default async function EngineerWalletPage() {
   }
 
   const wallet = await getMyWallet();
+  const { pkwt_restricted: _restricted, ...clientWallet } = wallet;
 
   return (
     <div className="space-y-4">
@@ -64,7 +65,7 @@ export default async function EngineerWalletPage() {
         <h1 className="text-2xl font-bold tracking-tight">Wallet Saya</h1>
         <p className="text-muted-foreground">Komisi ticket & penarikan saldo</p>
       </div>
-      <EngineerWalletClient {...wallet} />
+      <EngineerWalletClient {...clientWallet} />
     </div>
   );
 }

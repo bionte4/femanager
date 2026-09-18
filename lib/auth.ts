@@ -12,6 +12,7 @@ const loginSchema = z.object({
 
 export {
   ADMIN_ROLES,
+  CONTRACT_ADMIN_ROLES,
   NOC_L0_ROLES,
   NOC_L1_ROLES,
 } from "@/lib/auth.config";

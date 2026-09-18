@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { Role } from "@prisma/client";
-import { auth, ADMIN_ROLES } from "@/lib/auth";
+import { auth, CONTRACT_ADMIN_ROLES } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
   listEngineerContracts,
@@ -19,9 +19,9 @@ export default async function EngineerContractsPage({ params }: PageProps) {
   const session = await auth();
   if (
     !session?.user ||
-    !(ADMIN_ROLES as readonly string[]).includes(session.user.role)
+    !(CONTRACT_ADMIN_ROLES as readonly string[]).includes(session.user.role)
   ) {
-    redirect("/login");
+    redirect("/admin/engineers");
   }
 
   const { id } = await Promise.resolve(params);

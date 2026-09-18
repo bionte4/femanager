@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { auth, ADMIN_ROLES } from "@/lib/auth";
+import { auth, CONTRACT_ADMIN_ROLES } from "@/lib/auth";
 import { listExpiringContractsAction } from "@/app/actions/contracts";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -17,9 +17,9 @@ export default async function HrContractsInboxPage() {
   const session = await auth();
   if (
     !session?.user ||
-    !(ADMIN_ROLES as readonly string[]).includes(session.user.role)
+    !(CONTRACT_ADMIN_ROLES as readonly string[]).includes(session.user.role)
   ) {
-    redirect("/login");
+    redirect("/admin/dashboard");
   }
 
   const rows = await listExpiringContractsAction(30);

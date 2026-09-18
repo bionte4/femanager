@@ -40,12 +40,16 @@ type NavItem = {
   href: string;
   label: string;
   icon: LucideIcon;
+  /** Jika diisi, hanya role ini yang melihat menu */
+  roles?: readonly string[];
 };
 
 type NavGroup = {
   label: string;
   items: NavItem[];
 };
+
+const CONTRACT_ROLES = ["SUPER_ADMIN", "ADMIN_NOC"] as const;
 
 const NAV_GROUPS: NavGroup[] = [
   {
@@ -73,7 +77,12 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Mitra",
     items: [
       { href: "/admin/engineers", label: "Engineers", icon: HardHat },
-      { href: "/admin/hr/contracts", label: "Kontrak PKWT", icon: FileText },
+      {
+        href: "/admin/hr/contracts",
+        label: "Kontrak PKWT",
+        icon: FileText,
+        roles: CONTRACT_ROLES,
+      },
       { href: "/admin/recruitment", label: "Recruitment", icon: UserPlus },
       { href: "/admin/leaderboard", label: "Leaderboard", icon: Trophy },
       { href: "/admin/legal", label: "Legal", icon: Scale },
@@ -128,10 +137,17 @@ export function AdminSidebar({ userName, userRole }: AdminSidebarProps) {
 
   const roleLabel = userRole.replaceAll("_", " ");
 
+  const visibleGroups = NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter(
+      (item) => !item.roles || item.roles.includes(userRole)
+    ),
+  })).filter((group) => group.items.length > 0);
+
   const nav = (
     <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2.5 py-2.5">
       <div className="space-y-3.5">
-        {NAV_GROUPS.map((group) => (
+        {visibleGroups.map((group) => (
           <div key={group.label}>
             <p className="mb-1.5 px-2.5 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
               {group.label}

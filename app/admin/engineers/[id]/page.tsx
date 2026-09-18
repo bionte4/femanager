@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { auth, ADMIN_ROLES } from "@/lib/auth";
+import { auth, ADMIN_ROLES, CONTRACT_ADMIN_ROLES } from "@/lib/auth";
 import { getEngineerPerformance } from "@/lib/engineer-stats";
 import { formatMttr } from "@/lib/sla";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +27,10 @@ export default async function EngineerDetailPage({ params }: PageProps) {
   if (!session?.user || !(ADMIN_ROLES as readonly string[]).includes(session.user.role)) {
     redirect("/login");
   }
+
+  const canManageContracts = (CONTRACT_ADMIN_ROLES as readonly string[]).includes(
+    session.user.role
+  );
 
   const { id } = await Promise.resolve(params);
   const data = await getEngineerPerformance(id);
@@ -97,11 +101,13 @@ export default async function EngineerDetailPage({ params }: PageProps) {
               Kelola Sertifikasi SDWAN
             </Link>
           </Button>
-          <Button asChild size="sm" variant="outline" className="mt-3 ml-2">
-            <Link href={`/admin/engineers/${engineer.id}/contracts`}>
-              Kelola Kontrak PKWT
-            </Link>
-          </Button>
+          {canManageContracts && (
+            <Button asChild size="sm" variant="outline" className="mt-3 ml-2">
+              <Link href={`/admin/engineers/${engineer.id}/contracts`}>
+                Kelola Kontrak PKWT
+              </Link>
+            </Button>
+          )}
         </div>
       </div>
 

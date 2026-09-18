@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth";
 import { getMyWallet } from "@/app/actions/wallet";
 
 /**
- * GET /api/engineer/wallet — balance & transactions (engineer only)
+ * GET /api/engineer/wallet — balance & transactions (Mitra only full; PKWT restricted)
  */
 export async function GET() {
   try {

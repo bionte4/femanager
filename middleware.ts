@@ -6,8 +6,8 @@ const { auth } = NextAuth(authConfig);
 
 /**
  * Auth gate (login/role) di Edge.
- * Partnership SIGNED dicek di layout engineer via DB — bukan JWT di sini
- * (JWT stale bikin loop /agreement kosong + sync lama).
+ * Partnership SIGNED dicek di layout engineer via DB — bukan JWT di sini.
+ * /api/* dilindungi kecuali auth/cron/webhooks/external/candidates.
  */
 export default auth((req) => {
   const requestHeaders = new Headers(req.headers);
@@ -18,5 +18,11 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ["/admin/:path*", "/engineer/:path*", "/coordinator/:path*", "/login"],
+  matcher: [
+    "/admin/:path*",
+    "/engineer/:path*",
+    "/coordinator/:path*",
+    "/login",
+    "/api/:path*",
+  ],
 };

@@ -8,6 +8,9 @@ export const ADMIN_ROLES = [
   "NOC_L1",
 ] as const;
 
+/** Manage kontrak PKWT / klasifikasi kerja — bukan L0/Dispatcher */
+export const CONTRACT_ADMIN_ROLES = ["SUPER_ADMIN", "ADMIN_NOC"] as const;
+
 /** Role yang boleh escalate L0 → L1 */
 export const NOC_L0_ROLES = [
   "SUPER_ADMIN",
@@ -25,6 +28,17 @@ export const NOC_L1_ROLES = [
 
 function isAdminRole(role: string | undefined): boolean {
   return !!role && (ADMIN_ROLES as readonly string[]).includes(role);
+}
+
+/** Prefix API publik / non-session (punya auth sendiri) */
+function isPublicApiPath(pathname: string): boolean {
+  return (
+    pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/api/cron") ||
+    pathname.startsWith("/api/webhooks") ||
+    pathname.startsWith("/api/v1/external") ||
+    pathname.startsWith("/api/candidates")
+  );
 }
 
 export const authConfig = {
@@ -133,6 +147,12 @@ export const authConfig = {
           return Response.redirect(new URL("/login", request.url));
         }
         return true;
+      }
+
+      // API: wajib session kecuali route publik / cron / webhook / external
+      if (pathname.startsWith("/api")) {
+        if (isPublicApiPath(pathname)) return true;
+        return isLoggedIn;
       }
 
       return true;

@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { formatRupiah } from "@/lib/utils/rupiah";
 import { BANKS, MIN_WITHDRAWAL } from "@/lib/wallet-constants";
+import { isMitraEngagement } from "@/lib/eligibility";
 
 async function requireEngineer() {
   const session = await auth();
@@ -20,8 +21,33 @@ export type ActionResult<T = undefined> =
   | { success: true; data?: T }
   | { success: false; error: string };
 
-export async function getMyWallet() {
+export type WalletPayload = {
+  balance: number;
+  total_earned: number;
+  total_withdrawn: number;
+  total_penalty: number;
+  total_bonus: number;
+  active_tickets: number;
+  transactions: {
+    id: string;
+    type: string;
+    amount: number;
+    description: string;
+    ticket_no: string | null;
+    created_at: string;
+  }[];
+  /** true = PKWT: hanya saldo sisa, tanpa histori komisi */
+  pkwt_restricted: boolean;
+};
+
+export async function getMyWallet(): Promise<WalletPayload> {
   const session = await requireEngineer();
+
+  const eng = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { engagement_type: true },
+  });
+
   let wallet = await prisma.engineerWallet.findUnique({
     where: { engineer_id: session.user.id },
   });
@@ -29,6 +55,20 @@ export async function getMyWallet() {
     wallet = await prisma.engineerWallet.create({
       data: { engineer_id: session.user.id },
     });
+  }
+
+  // PKWT: jangan expose riwayat komisi mitra lewat API
+  if (!eng || !isMitraEngagement(eng.engagement_type)) {
+    return {
+      balance: wallet.balance,
+      total_earned: 0,
+      total_withdrawn: 0,
+      total_penalty: 0,
+      total_bonus: 0,
+      active_tickets: 0,
+      transactions: [],
+      pkwt_restricted: true,
+    };
   }
 
   const [transactions, bonusSum, pendingCount] = await Promise.all([
@@ -65,6 +105,7 @@ export async function getMyWallet() {
       ticket_no: t.ticket?.ticket_no ?? null,
       created_at: t.created_at.toISOString(),
     })),
+    pkwt_restricted: false,
   };
 }
 
@@ -139,6 +180,15 @@ export async function requestWithdrawal(
 
 export async function getMyWithdrawals() {
   const session = await requireEngineer();
+
+  const eng = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { engagement_type: true },
+  });
+  if (!eng || !isMitraEngagement(eng.engagement_type)) {
+    throw new Error("History penarikan hanya untuk Mitra");
+  }
+
   const items = await prisma.withdrawal.findMany({
     where: { engineer_id: session.user.id },
     orderBy: { requested_at: "desc" },

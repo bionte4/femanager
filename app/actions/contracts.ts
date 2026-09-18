@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { type EngagementType, type EngineerContractType } from "@prisma/client";
-import { auth, ADMIN_ROLES } from "@/lib/auth";
+import { auth, CONTRACT_ADMIN_ROLES } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
   contractTypeToEngagement,
@@ -19,9 +19,9 @@ async function requireContractAdmin() {
   const session = await auth();
   if (
     !session?.user ||
-    !(ADMIN_ROLES as readonly string[]).includes(session.user.role)
+    !(CONTRACT_ADMIN_ROLES as readonly string[]).includes(session.user.role)
   ) {
-    throw new Error("Unauthorized");
+    throw new Error("Unauthorized — hanya SUPER_ADMIN / ADMIN_NOC");
   }
   return session;
 }
@@ -53,6 +53,36 @@ function revalidateContractPaths(userId: string) {
   revalidatePath("/admin/engineers");
 }
 
+function assertHttpsDocumentUrl(raw: string): string | null {
+  const url = raw.trim();
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:") {
+      throw new Error("URL dokumen harus https://");
+    }
+    return parsed.toString();
+  } catch (e) {
+    if (e instanceof Error && e.message.includes("https")) throw e;
+    throw new Error("URL dokumen tidak valid");
+  }
+}
+
+async function assertNoPendingWithdrawal(userId: string) {
+  const pending = await prisma.withdrawal.findFirst({
+    where: {
+      engineer_id: userId,
+      status: { in: ["PENDING", "APPROVED"] },
+    },
+    select: { id: true },
+  });
+  if (pending) {
+    throw new Error(
+      "Ada withdrawal pending/approved — selesaikan dulu sebelum ganti engagement"
+    );
+  }
+}
+
 async function ensureEngagementForContract(params: {
   userId: string;
   contractType: EngineerContractType;
@@ -66,6 +96,9 @@ async function ensureEngagementForContract(params: {
   });
   if (!user) throw new Error("Engineer tidak ditemukan");
   if (user.engagement_type === target) return;
+
+  // Flip klasifikasi kerja = sensitif; blok jika ada cashout pending
+  await assertNoPendingWithdrawal(params.userId);
 
   await prisma.$transaction([
     prisma.user.update({
@@ -119,14 +152,9 @@ export async function createEngineerContractAction(
       return { success: false, error: "end_at harus setelah start_at" };
     }
 
-    const docUrl = parsed.data.document_url?.trim();
-    if (docUrl) {
-      try {
-        new URL(docUrl);
-      } catch {
-        return { success: false, error: "URL dokumen tidak valid" };
-      }
-    }
+    const docUrl = parsed.data.document_url
+      ? assertHttpsDocumentUrl(parsed.data.document_url)
+      : null;
 
     const engineer = await prisma.user.findFirst({
       where: { id: parsed.data.user_id, role: "FIELD_ENGINEER" },
@@ -157,7 +185,7 @@ export async function createEngineerContractAction(
         end_at: endAt,
         client_label: parsed.data.client_label?.trim() || null,
         placement_cities: parseCities(parsed.data.placement_cities),
-        document_url: docUrl || null,
+        document_url: docUrl,
         notes: parsed.data.notes?.trim() || null,
         created_by: session.user.id,
       },
@@ -390,16 +418,12 @@ export async function switchEngagementAction(
       return { success: true };
     }
 
-    const pendingWithdraw = await prisma.withdrawal.findFirst({
-      where: {
-        engineer_id: user.id,
-        status: { in: ["PENDING", "APPROVED"] },
-      },
-    });
-    if (pendingWithdraw) {
+    try {
+      await assertNoPendingWithdrawal(user.id);
+    } catch (e) {
       return {
         success: false,
-        error: "Ada withdrawal pending/approved — selesaikan dulu sebelum ganti engagement",
+        error: e instanceof Error ? e.message : "Gagal validasi withdrawal",
       };
     }
 
