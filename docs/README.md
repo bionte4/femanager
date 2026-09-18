@@ -8,6 +8,7 @@
 | [ENGAGEMENT.md](./ENGAGEMENT.md) | Mitra vs PKWT — eligibility, kontrak, payroll, RBAC |
 | [ERD.md](./ERD.md) | Entity Relationship Diagram (Mermaid) + kamus model |
 | [BUSINESS_PLAN.md](./BUSINESS_PLAN.md) | Model bisnis, GTM, roadmap, risiko |
+| [PITCH_DECK.md](./PITCH_DECK.md) | **Kerangka pitch deck** CEO & investor (18 slide) |
 
 Dokumen uji / legal (root):
 

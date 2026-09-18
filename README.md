@@ -14,6 +14,7 @@ Stack: **Next.js 14** (App Router) · **TypeScript** · **Tailwind** · **Prisma
 | [docs/ENGAGEMENT.md](./docs/ENGAGEMENT.md) | Mitra vs PKWT (eligibility, kontrak, payroll) |
 | [docs/ERD.md](./docs/ERD.md) | ERD & model data |
 | [docs/BUSINESS_PLAN.md](./docs/BUSINESS_PLAN.md) | Business plan & roadmap |
+| [docs/PITCH_DECK.md](./docs/PITCH_DECK.md) | Kerangka pitch deck CEO & investor |
 | [docs/README.md](./docs/README.md) | Indeks dokumentasi |
 
 ---
