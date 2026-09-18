@@ -95,7 +95,7 @@ export async function createSparepart(
   input: SparepartInput
 ): Promise<ActionResult<{ id: string }>> {
   try {
-    await requireAdmin();
+    const session = await requireAdmin();
     const data = sparepartSchema.parse(input);
 
     const existing = await prisma.sparepart.findUnique({ where: { sku: data.sku } });
@@ -112,6 +112,20 @@ export async function createSparepart(
       },
     });
 
+    if (data.stock_qty > 0) {
+      await prisma.sparepartMutation.create({
+        data: {
+          sparepart_id: created.id,
+          user_id: session.user.id,
+          type: "IN",
+          qty: data.stock_qty,
+          stock_before: 0,
+          stock_after: data.stock_qty,
+          notes: "Initial stock on create",
+        },
+      });
+    }
+
     revalidatePath("/admin/spareparts");
     return { success: true, data: { id: created.id } };
   } catch (e) {
@@ -124,7 +138,7 @@ export async function updateSparepart(
   input: SparepartInput
 ): Promise<ActionResult> {
   try {
-    await requireAdmin();
+    const session = await requireAdmin();
     const data = sparepartSchema.parse(input);
 
     const conflict = await prisma.sparepart.findFirst({
@@ -132,16 +146,36 @@ export async function updateSparepart(
     });
     if (conflict) return { success: false, error: "SKU sudah dipakai" };
 
-    await prisma.sparepart.update({
-      where: { id },
-      data: {
-        name: data.name,
-        sku: data.sku,
-        stock_qty: data.stock_qty,
-        location_type: data.location_type,
-        holder_id:
-          data.location_type === "ENGINEER" ? data.holder_id || null : null,
-      },
+    const existing = await prisma.sparepart.findUnique({ where: { id } });
+    if (!existing) return { success: false, error: "Sparepart tidak ditemukan" };
+
+    await prisma.$transaction(async (tx) => {
+      await tx.sparepart.update({
+        where: { id },
+        data: {
+          name: data.name,
+          sku: data.sku,
+          stock_qty: data.stock_qty,
+          location_type: data.location_type,
+          holder_id:
+            data.location_type === "ENGINEER" ? data.holder_id || null : null,
+        },
+      });
+
+      if (data.stock_qty !== existing.stock_qty) {
+        const delta = data.stock_qty - existing.stock_qty;
+        await tx.sparepartMutation.create({
+          data: {
+            sparepart_id: id,
+            user_id: session.user.id,
+            type: "ADJUST",
+            qty: Math.abs(delta),
+            stock_before: existing.stock_qty,
+            stock_after: data.stock_qty,
+            notes: `Manual adjust (${delta >= 0 ? "+" : ""}${delta})`,
+          },
+        });
+      }
     });
 
     revalidatePath("/admin/spareparts");
@@ -162,26 +196,67 @@ export async function deleteSparepart(id: string): Promise<ActionResult> {
   }
 }
 
-/** Kurangi stok saat escalate butuh sparepart */
-export async function consumeSparepart(sparepartId: string, qty = 1): Promise<ActionResult> {
+/** Kurangi stok saat escalate butuh sparepart — catat ledger OUT */
+export async function consumeSparepart(
+  sparepartId: string,
+  qty = 1,
+  opts?: { ticket_id?: string | null; notes?: string | null }
+): Promise<ActionResult> {
   try {
     const session = await auth();
     if (!session?.user) return { success: false, error: "Unauthorized" };
 
-    const item = await prisma.sparepart.findUnique({ where: { id: sparepartId } });
-    if (!item) return { success: false, error: "Sparepart tidak ditemukan" };
-    if (item.stock_qty < qty) return { success: false, error: "Stok tidak cukup" };
+    const amount = Math.max(1, Math.floor(qty));
 
-    await prisma.sparepart.update({
-      where: { id: sparepartId },
-      data: { stock_qty: { decrement: qty } },
+    await prisma.$transaction(async (tx) => {
+      const item = await tx.sparepart.findUnique({ where: { id: sparepartId } });
+      if (!item) throw new Error("Sparepart tidak ditemukan");
+      if (item.stock_qty < amount) throw new Error("Stok tidak cukup");
+
+      const stock_after = item.stock_qty - amount;
+      await tx.sparepart.update({
+        where: { id: sparepartId },
+        data: { stock_qty: stock_after },
+      });
+      await tx.sparepartMutation.create({
+        data: {
+          sparepart_id: sparepartId,
+          ticket_id: opts?.ticket_id ?? null,
+          user_id: session.user.id,
+          type: "OUT",
+          qty: amount,
+          stock_before: item.stock_qty,
+          stock_after,
+          notes: opts?.notes?.trim() || "Consume for ticket",
+        },
+      });
     });
 
     revalidatePath("/admin/spareparts");
+    if (opts?.ticket_id) {
+      revalidatePath(`/admin/tickets/${opts.ticket_id}`);
+      revalidatePath(`/engineer/tickets/${opts.ticket_id}`);
+    }
     return { success: true };
   } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : "Gagal kurangi stok" };
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Gagal kurangi stok",
+    };
   }
+}
+
+export async function getSparepartMutations(sparepartId: string, limit = 50) {
+  await requireAdmin();
+  return prisma.sparepartMutation.findMany({
+    where: { sparepart_id: sparepartId },
+    orderBy: { created_at: "desc" },
+    take: Math.min(100, Math.max(5, limit)),
+    include: {
+      user: { select: { id: true, full_name: true } },
+      ticket: { select: { id: true, ticket_no: true } },
+    },
+  });
 }
 
 /** Export semua sparepart untuk Excel (client compose XLSX) */

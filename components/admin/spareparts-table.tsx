@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { History, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import type { LocationType } from "@prisma/client";
+import type { LocationType, SparepartMutationType } from "@prisma/client";
 import {
   createSparepart,
   deleteSparepart,
+  getSparepartMutations,
   updateSparepart,
 } from "@/app/actions/spareparts";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -49,6 +51,18 @@ type SparepartRow = {
 
 type EngineerOption = { id: string; full_name: string };
 
+type MutationRow = {
+  id: string;
+  type: SparepartMutationType;
+  qty: number;
+  stock_before: number;
+  stock_after: number;
+  notes: string | null;
+  created_at: Date | string;
+  user: { id: string; full_name: string } | null;
+  ticket: { id: string; ticket_no: string } | null;
+};
+
 export function SparepartsTable({
   items,
   engineers,
@@ -67,6 +81,9 @@ export function SparepartsTable({
     location_type: "WAREHOUSE" as LocationType,
     holder_id: "",
   });
+  const [historyFor, setHistoryFor] = useState<SparepartRow | null>(null);
+  const [mutations, setMutations] = useState<MutationRow[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   function openCreate() {
     setEditing(null);
@@ -90,6 +107,19 @@ export function SparepartsTable({
       holder_id: row.holder_id ?? "",
     });
     setOpen(true);
+  }
+
+  async function openHistory(row: SparepartRow) {
+    setHistoryFor(row);
+    setHistoryLoading(true);
+    try {
+      const rows = await getSparepartMutations(row.id);
+      setMutations(rows);
+    } catch {
+      toast.error("Gagal load mutasi");
+      setMutations([]);
+    }
+    setHistoryLoading(false);
   }
 
   async function handleSave() {
@@ -156,7 +186,7 @@ export function SparepartsTable({
                 <TableHead>Stok</TableHead>
                 <TableHead>Lokasi</TableHead>
                 <TableHead>Holder</TableHead>
-                <TableHead className="w-24" />
+                <TableHead className="w-28" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -175,6 +205,14 @@ export function SparepartsTable({
                   <TableCell>{s.holder?.full_name ?? "—"}</TableCell>
                   <TableCell>
                     <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Riwayat mutasi"
+                        onClick={() => openHistory(s)}
+                      >
+                        <History className="h-4 w-4" />
+                      </Button>
                       <Button variant="ghost" size="icon" onClick={() => openEdit(s)}>
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -269,6 +307,65 @@ export function SparepartsTable({
               {saving ? "Menyimpan..." : "Simpan"}
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!historyFor}
+        onOpenChange={(v) => {
+          if (!v) {
+            setHistoryFor(null);
+            setMutations([]);
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Mutasi · {historyFor?.sku}</DialogTitle>
+          </DialogHeader>
+          {historyLoading ? (
+            <p className="text-sm text-muted-foreground">Memuat…</p>
+          ) : mutations.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Belum ada mutasi.</p>
+          ) : (
+            <div className="max-h-80 space-y-2 overflow-y-auto">
+              {mutations.map((m) => (
+                <div key={m.id} className="rounded-md border px-2.5 py-2 text-xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <Badge
+                      variant={
+                        m.type === "OUT"
+                          ? "destructive"
+                          : m.type === "IN"
+                            ? "secondary"
+                            : "outline"
+                      }
+                    >
+                      {m.type} {m.type === "OUT" ? `−${m.qty}` : `+${m.qty}`}
+                    </Badge>
+                    <span className="font-mono text-muted-foreground">
+                      {m.stock_before} → {m.stock_after}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-muted-foreground">
+                    {new Date(m.created_at).toLocaleString("id-ID")}
+                    {m.user ? ` · ${m.user.full_name}` : ""}
+                  </p>
+                  {m.ticket && (
+                    <Link
+                      href={`/admin/tickets/${m.ticket.id}`}
+                      className="mt-0.5 inline-block font-mono text-sky-700 hover:underline"
+                    >
+                      {m.ticket.ticket_no}
+                    </Link>
+                  )}
+                  {m.notes && (
+                    <p className="mt-0.5 text-muted-foreground">{m.notes}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </>

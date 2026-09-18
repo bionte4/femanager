@@ -1,7 +1,30 @@
 /**
  * Stop clock SLA: saat pause, countdown dibekukan.
  * Saat resume, sisa waktu ditambahkan ke sla_due_at.
+ * Pause bank di atas threshold butuh approve L1 (kecuali role approver).
  */
+
+import { NOC_L1_ROLES } from "@/lib/auth.config";
+
+/** Default 2 jam — override via STOP_CLOCK_APPROVAL_HOURS */
+export function getStopClockApprovalThresholdMs(): number {
+  const hours = Number(process.env.STOP_CLOCK_APPROVAL_HOURS ?? "2");
+  const safe = Number.isFinite(hours) && hours > 0 ? hours : 2;
+  return Math.round(safe * 60 * 60 * 1000);
+}
+
+export function canApproveStopClock(role: string): boolean {
+  return (NOC_L1_ROLES as readonly string[]).includes(role);
+}
+
+/** Non-approver yang sudah pakai pause ≥ threshold harus minta approve L1 */
+export function needsStopClockApproval(
+  role: string,
+  slaPausedTotalMs: number
+): boolean {
+  if (canApproveStopClock(role)) return false;
+  return slaPausedTotalMs >= getStopClockApprovalThresholdMs();
+}
 
 export type StopClockTicket = {
   sla_due_at: Date | null;

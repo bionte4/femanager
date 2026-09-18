@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { auth, ADMIN_ROLES, NOC_L0_ROLES } from "@/lib/auth";
+import { auth, ADMIN_ROLES, NOC_L0_ROLES, NOC_L1_ROLES } from "@/lib/auth";
 import {
   getAssignableEngineers,
   getTicketById,
 } from "@/app/actions/tickets";
+import { AcceptCountdown } from "@/components/sla-countdown/accept-countdown";
 import { SLACountdown } from "@/components/sla-countdown/sla-countdown";
 import { PriorityBadge, TicketStatusBadge } from "@/components/ticket/status-badge";
 import { TicketTimeline } from "@/components/ticket/ticket-timeline";
@@ -68,21 +69,36 @@ export default async function TicketDetailPage({ params }: PageProps) {
                 Stop clock
               </span>
             )}
+            {ticket.stop_clock_approval_status === "PENDING" && (
+              <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
+                Stop clock pending L1
+              </span>
+            )}
           </div>
           <p className="text-xs text-muted-foreground">{ticket.description}</p>
         </div>
-        <div className="text-right">
-          <p className="mb-1 text-xs text-muted-foreground">SLA Countdown</p>
-          <SLACountdown
-            dueAt={ticket.sla_due_at}
-            pausedAt={ticket.sla_paused_at}
-            pausedTotalMs={ticket.sla_paused_total_ms}
-          />
-          {ticket.sla_paused_total_ms > 0 && (
-            <p className="mt-1 text-[10px] text-muted-foreground">
-              Total pause: {Math.round(ticket.sla_paused_total_ms / 60_000)} mnt
-            </p>
-          )}
+        <div className="space-y-2 text-right">
+          <div>
+            <p className="mb-1 text-xs text-muted-foreground">SLA Countdown</p>
+            <SLACountdown
+              dueAt={ticket.sla_due_at}
+              pausedAt={ticket.sla_paused_at}
+              pausedTotalMs={ticket.sla_paused_total_ms}
+            />
+            {ticket.sla_paused_total_ms > 0 && (
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                Total pause: {Math.round(ticket.sla_paused_total_ms / 60_000)} mnt
+              </p>
+            )}
+          </div>
+          {ticket.status === "ASSIGNED" &&
+            !ticket.accepted_at &&
+            ticket.last_assigned_at && (
+              <div>
+                <p className="mb-1 text-xs text-muted-foreground">Accept deadline</p>
+                <AcceptCountdown lastAssignedAt={ticket.last_assigned_at} />
+              </div>
+            )}
         </div>
       </div>
 
@@ -225,7 +241,11 @@ export default async function TicketDetailPage({ params }: PageProps) {
             engineers={engineers}
             slaPausedAt={ticket.sla_paused_at}
             stopClockReason={ticket.stop_clock_reason}
+            stopClockApprovalStatus={ticket.stop_clock_approval_status}
             canEscalateL0={(NOC_L0_ROLES as readonly string[]).includes(
+              session.user.role
+            )}
+            canApproveStopClock={(NOC_L1_ROLES as readonly string[]).includes(
               session.user.role
             )}
           />

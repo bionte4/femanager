@@ -200,6 +200,8 @@ model User {
   agreements       EngineerAgreement[]
   compliance_logs  ComplianceLog[]
   notifications    AppNotification[]
+  push_tokens      PushDeviceToken[]
+  sparepart_mutations SparepartMutation[]
 
   @@map("users")
 }
@@ -293,6 +295,12 @@ model Ticket {
   sla_paused_at         DateTime?
   sla_paused_total_ms   Int          @default(0)
   stop_clock_reason     String?
+  /// PENDING | APPROVED | REJECTED | null — approval L1 jika pause bank > threshold
+  stop_clock_approval_status String?
+  stop_clock_requested_at    DateTime?
+  stop_clock_requested_by    String?
+  stop_clock_approved_by     String?
+  stop_clock_approved_at     DateTime?
   escalated_to_l1_at    DateTime?
   escalated_by_id       String?
   /// Handover L0→L1: { symptoms, last_ping, remote_actions[], notes, handed_over_at, handed_over_by }
@@ -314,12 +322,14 @@ model Ticket {
   wallet_transactions WalletTransaction[]
   rating             EngineerRating?
   fraud_logs         FraudLog[]
+  sparepart_mutations SparepartMutation[]
 
   @@index([status])
   @@index([assigned_engineer_id])
   @@index([tenant_id])
   @@index([service_category_id])
   @@index([status, last_assigned_at])
+  @@index([stop_clock_approval_status])
   @@map("tickets")
 }
 
@@ -357,9 +367,55 @@ model Sparepart {
   created_at    DateTime     @default(now())
   updated_at    DateTime     @updatedAt
 
-  holder User? @relation("SparepartHolder", fields: [holder_id], references: [id])
+  holder     User?               @relation("SparepartHolder", fields: [holder_id], references: [id])
+  mutations  SparepartMutation[]
 
   @@map("spareparts")
+}
+
+enum SparepartMutationType {
+  IN
+  OUT
+  ADJUST
+}
+
+/// Ledger mutasi stok (keluar/masuk/adjust) — tied ke ticket jika ada
+model SparepartMutation {
+  id           String                @id @default(cuid())
+  sparepart_id String
+  ticket_id    String?
+  user_id      String?
+  type         SparepartMutationType
+  qty          Int
+  stock_before Int
+  stock_after  Int
+  notes        String?
+  created_at   DateTime              @default(now())
+
+  sparepart Sparepart @relation(fields: [sparepart_id], references: [id], onDelete: Cascade)
+  ticket    Ticket?   @relation(fields: [ticket_id], references: [id], onDelete: SetNull)
+  user      User?     @relation(fields: [user_id], references: [id], onDelete: SetNull)
+
+  @@index([sparepart_id, created_at])
+  @@index([ticket_id])
+  @@index([created_at])
+  @@map("sparepart_mutations")
+}
+
+/// FCM / device push token per user (web PWA atau native)
+model PushDeviceToken {
+  id           String   @id @default(cuid())
+  user_id      String
+  token        String   @unique
+  platform     String   @default("web")
+  user_agent   String?
+  last_seen_at DateTime @default(now())
+  created_at   DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("push_device_tokens")
 }
 
 model Integration {

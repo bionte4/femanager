@@ -1,5 +1,6 @@
 import { Role, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { sendFcmToUser, sendFcmToUsers } from "@/lib/fcm";
 
 export type NotifyPayload = {
   title: string;
@@ -9,14 +10,14 @@ export type NotifyPayload = {
   ticket_id?: string | null;
 };
 
-/** Kirim notifikasi in-app ke satu user */
+/** Kirim notifikasi in-app + FCM (jika token terdaftar) ke satu user */
 export async function notifyUser(
   userId: string,
   payload: NotifyPayload,
   tx?: Prisma.TransactionClient
 ) {
   const db = tx ?? prisma;
-  return db.appNotification.create({
+  const row = await db.appNotification.create({
     data: {
       user_id: userId,
       title: payload.title,
@@ -26,6 +27,13 @@ export async function notifyUser(
       ticket_id: payload.ticket_id ?? null,
     },
   });
+
+  // FCM di luar transaksi — jangan block DB commit
+  if (!tx) {
+    void sendFcmToUser(userId, payload).catch(() => undefined);
+  }
+
+  return row;
 }
 
 /** Broadcast ke semua user dengan role tertentu */
@@ -54,6 +62,11 @@ export async function notifyRoles(
       ticket_id: payload.ticket_id ?? null,
     })),
   });
+
+  void sendFcmToUsers(
+    users.map((u) => u.id),
+    payload
+  ).catch(() => undefined);
 
   return users.length;
 }
@@ -86,14 +99,17 @@ export async function notifyEscalateL1(ticket: {
   });
 }
 
-export async function notifyAssigned(engineerId: string, ticket: {
-  id: string;
-  ticket_no: string;
-  tenantName: string;
-}) {
+export async function notifyAssigned(
+  engineerId: string,
+  ticket: {
+    id: string;
+    ticket_no: string;
+    tenantName: string;
+  }
+) {
   return notifyUser(engineerId, {
     title: `Job baru ${ticket.ticket_no}`,
-    body: `Assigned ke ${ticket.tenantName}`,
+    body: `Assigned ke ${ticket.tenantName} — accept dalam 15 menit`,
     href: `/engineer/tickets/${ticket.id}`,
     type: "ASSIGNED",
     ticket_id: ticket.id,
@@ -131,4 +147,19 @@ export async function notifyStopClock(ticket: {
       ticket_id: ticket.id,
     });
   }
+}
+
+/** Minta approve stop clock ke L1 */
+export async function notifyStopClockApprovalRequest(ticket: {
+  id: string;
+  ticket_no: string;
+  reason: string;
+}) {
+  return notifyRoles([Role.NOC_L1, Role.ADMIN_NOC, Role.SUPER_ADMIN], {
+    title: `Approve stop clock · ${ticket.ticket_no}`,
+    body: ticket.reason.slice(0, 120),
+    href: `/admin/tickets/${ticket.id}`,
+    type: "STOP_CLOCK_APPROVAL",
+    ticket_id: ticket.id,
+  });
 }

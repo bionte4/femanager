@@ -42,15 +42,18 @@ Sebaran toko & engineer (Mapbox). Status device hijau/merah.
    - Last ping / status monitor
    - Aksi remote yang sudah dicoba
 3. **L1 Queue** — claim ticket, buka detail, assign FE.
+4. **Waiting Accept** — ticket ASSIGNED belum di-accept FE; countdown **15 menit** sebelum cron re-assign.
 
 ### 3.4 Tickets
 - Buat ticket (manual / dari monitoring).
 - Detail ticket: timeline, foto, anti-fraud, **SLA by phase**, **Stop Clock**, escalate L0→L1, assign engineer.
 - **Stop Clock**: pause SLA dengan alasan (≥5 karakter); Resume menggeser due date.
+- Jika **total pause bank ≥ threshold** (default 2 jam, env `STOP_CLOCK_APPROVAL_HOURS`), role non-L1 harus **minta approve L1** dulu. L1 Approve/Reject di panel aksi.
 
 ### 3.5 Master data
 - **Tenants / Devices / Kategori / Spareparts / KB**
 - Spareparts: Export/Import Excel dengan **preview** sebelum commit.
+- Ikon **History** di sparepart → ledger mutasi IN/OUT/ADJUST (tied ke ticket jika consume).
 
 ### 3.6 Mitra
 - Engineers, sertifikasi skill, recruitment kandidat, leaderboard, legal perjanjian.
@@ -64,8 +67,9 @@ Sebaran toko & engineer (Mapbox). Status device hijau/merah.
 - API key customer ITSM, webhook outbound.
 - **Webhook DLQ**: antrian gagal kirim — Process now / Replay / mark DEAD.
 
-### 3.9 Notifikasi (Bell)
-Notifikasi in-app: ticket baru, escalate L1, assign, stop clock. Poll ~30 detik.
+### 3.9 Notifikasi (Bell + FCM)
+Notifikasi in-app: ticket baru, escalate L1, assign, stop clock, approve stop clock. Poll ~30 detik.
+Push FCM (opsional): set `FCM_SERVER_KEY` + `NEXT_PUBLIC_FIREBASE_*` — FE PWA auto-register token.
 
 ---
 

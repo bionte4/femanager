@@ -161,8 +161,13 @@ OPEN → ASSIGNED → ON_THE_WAY → ON_SITE → IN_PROGRESS
 Field SLA khusus pada `Ticket`:
 - `sla_due_at` — target resolve
 - `sla_paused_at` / `sla_paused_total_ms` / `stop_clock_reason` — stop clock
+- `stop_clock_approval_status` / `stop_clock_requested_*` / `stop_clock_approved_*` — approve L1
 - `l1_handover` — JSON handover L0→L1
 - `escalated_to_l1_at` / `escalated_by_id`
+
+Model tambahan Sprint D:
+- `PushDeviceToken` — FCM token per user
+- `SparepartMutation` — ledger IN/OUT/ADJUST (opsional `ticket_id`)
 
 ---
 
@@ -175,9 +180,12 @@ Device 0..1──* Ticket
 User (FE) 0..1──* Ticket (assigned)
 Ticket 1──* TicketLog
 Ticket 0..1──1 ExternalTicket
+Ticket 0..*── SparepartMutation
+Sparepart 1──* SparepartMutation
 Integration 1──* ExternalTicket
 Integration 1──* WebhookDeadLetter
 User 1──* AppNotification
+User 1──* PushDeviceToken
 User 1──* SkillCertification
 ```
 

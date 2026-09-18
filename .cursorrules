@@ -1,6 +1,3 @@
-Siap, ini `.cursorrules` super lengkap khusus buat project kamu. Tinggal copy paste jadi file `.cursorrules` di root project Cursor kamu.
-
-Ini udah aku optimasi biar Cursor paham konteks *SLA Field Engineer EDC/LAN/WAN Indonesia*.
 
 # PROJECT: FE-Track - Field Engineer Dispatch & SLA Management Platform
 
@@ -92,16 +89,3 @@ Buatkan function `autoDispatchTicket(ticketId)`:
 ## 9. OUTPUT YANG DIHARAPKAN
 Saat saya minta fitur, langsung generate code lengkap: component, supabase query, types, dan SQL migration jika butuh tabel baru. Langsung bisa run `npm run dev`.
 
-Cara Pakai:
-
-1. Buka Cursor -> Buat project http://Next.js baru: `npx create-next-app@latest fe-track`
-2. Paste file di atas jadi `.cursorrules` di root
-3. Prompt pertama ke Cursor:
-
-> "Setup project sesuai.cursorrules. Buat migration SQL untuk semua tabel + RLS + PostGIS extension, setup Supabase client, dan buat dashboard admin layout dengan sidebar"
-
-4. Prompt kedua:
-
-> "Buatkan fitur auto dispatch engine + SLA countdown component + PWA halaman engineer dengan GPS check-in 100m"
-
-Mau aku bikinin juga *prompt SQL Migration Supabase* siap paste nya biar gak error PostGIS?

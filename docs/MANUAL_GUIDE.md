@@ -74,6 +74,9 @@ Lihat `.env.example`. Yang penting:
 | `MONITORING_WEBHOOK_SECRET` | Auth webhook Zabbix/Uptime |
 | `MAPBOX_TOKEN` / `NEXT_PUBLIC_MAPBOX_*` | Peta |
 | Token WA gateway | Notifikasi assign (opsional) |
+| `STOP_CLOCK_APPROVAL_HOURS` | Threshold pause bank → butuh L1 (default `2`) |
+| `FCM_SERVER_KEY` | Legacy FCM server key (opsional) |
+| `NEXT_PUBLIC_FIREBASE_*` + `VAPID_KEY` | Client register push token (opsional) |
 
 ---
 

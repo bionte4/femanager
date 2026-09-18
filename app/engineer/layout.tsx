@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { EngineerBottomNav } from "@/components/engineer/bottom-nav";
 import { PwaRegister } from "@/components/engineer/pwa-register";
+import { PushRegister } from "@/components/engineer/push-register";
 
 export default async function EngineerLayout({
   children,
@@ -28,6 +29,7 @@ export default async function EngineerLayout({
   return (
     <div className="mx-auto min-h-screen max-w-lg bg-background">
       <PwaRegister />
+      <PushRegister />
       <header className="sticky top-0 z-30 border-b border-border bg-background/95 px-4 py-2.5 backdrop-blur">
         <div className="flex items-center justify-between">
           <div>

@@ -88,6 +88,12 @@ export function KbAdminClient({ items }: { items: Kb[] }) {
               <SelectContent>
                 <SelectItem value="EDC">EDC</SelectItem>
                 <SelectItem value="SDWAN">SDWAN</SelectItem>
+                <SelectItem value="LAN">LAN</SelectItem>
+                <SelectItem value="WAN">WAN</SelectItem>
+                <SelectItem value="WIFI">WIFI</SelectItem>
+                <SelectItem value="CCTV">CCTV</SelectItem>
+                <SelectItem value="PRINTER">PRINTER</SelectItem>
+                <SelectItem value="GENERAL">GENERAL</SelectItem>
               </SelectContent>
             </Select>
           </div>

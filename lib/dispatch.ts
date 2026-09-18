@@ -369,7 +369,16 @@ export async function autoDispatchTicket(
   };
 }
 
-const ACCEPT_TIMEOUT_MS = 15 * 60 * 1000;
+/** Timeout accept job sebelum auto re-assign (cron + UI countdown) */
+export const ACCEPT_TIMEOUT_MS = 15 * 60 * 1000;
+
+export function getAcceptDeadline(lastAssignedAt: Date | string): Date {
+  const start =
+    typeof lastAssignedAt === "string"
+      ? new Date(lastAssignedAt)
+      : lastAssignedAt;
+  return new Date(start.getTime() + ACCEPT_TIMEOUT_MS);
+}
 
 /**
  * Cron: ticket ASSIGNED belum accept >15 menit → log TIMEOUT + re-dispatch

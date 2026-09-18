@@ -64,6 +64,21 @@ export async function getL1RoutingQueue() {
   });
 }
 
+/** Antrian menunggu FE accept (countdown 15 menit sebelum re-assign) */
+export async function getWaitingAcceptQueue() {
+  await requireAdmin();
+  return prisma.ticket.findMany({
+    where: {
+      status: TicketStatus.ASSIGNED,
+      accepted_at: null,
+      last_assigned_at: { not: null },
+    },
+    include: ticketListInclude,
+    orderBy: [{ last_assigned_at: "asc" }],
+    take: 100,
+  });
+}
+
 /**
  * Eskalasi L0 → L1 wajib isi handover: gejala, last ping, aksi remote.
  */
@@ -198,7 +213,7 @@ export async function claimL1TicketAction(input: {
 
 export async function getRoutingCounts() {
   await requireAdmin();
-  const [l0, l1] = await Promise.all([
+  const [l0, l1, accept] = await Promise.all([
     prisma.ticket.count({
       where: {
         status: {
@@ -212,6 +227,13 @@ export async function getRoutingCounts() {
       },
     }),
     prisma.ticket.count({ where: { status: TicketStatus.PENDING_L1 } }),
+    prisma.ticket.count({
+      where: {
+        status: TicketStatus.ASSIGNED,
+        accepted_at: null,
+        last_assigned_at: { not: null },
+      },
+    }),
   ]);
-  return { l0, l1 };
+  return { l0, l1, accept };
 }

@@ -379,7 +379,7 @@ export async function updateTicketStatusAction(
 export async function pauseSlaClockAction(input: {
   ticket_id: string;
   reason: string;
-}): Promise<ActionResult> {
+}): Promise<ActionResult<{ pending_approval?: boolean }>> {
   try {
     const session = await requireAdmin();
     const reason = input.reason?.trim();
@@ -397,6 +397,9 @@ export async function pauseSlaClockAction(input: {
     if (ticket.sla_paused_at) {
       return { success: false, error: "SLA sudah di-pause" };
     }
+    if (ticket.stop_clock_approval_status === "PENDING") {
+      return { success: false, error: "Menunggu approve L1 untuk stop clock" };
+    }
     if (
       ticket.status === TicketStatus.RESOLVED ||
       ticket.status === TicketStatus.CLOSED
@@ -404,13 +407,65 @@ export async function pauseSlaClockAction(input: {
       return { success: false, error: "Ticket sudah selesai" };
     }
 
+    const {
+      needsStopClockApproval,
+      canApproveStopClock,
+    } = await import("@/lib/stop-clock");
     const now = new Date();
+
+    // Pause bank sudah ≥ threshold → non-L1 harus minta approve dulu
+    if (needsStopClockApproval(session.user.role, ticket.sla_paused_total_ms)) {
+      await prisma.$transaction(async (tx) => {
+        await tx.ticket.update({
+          where: { id: ticket.id },
+          data: {
+            stop_clock_reason: reason,
+            stop_clock_approval_status: "PENDING",
+            stop_clock_requested_at: now,
+            stop_clock_requested_by: session.user.id,
+            stop_clock_approved_by: null,
+            stop_clock_approved_at: null,
+          },
+        });
+        await tx.ticketLog.create({
+          data: {
+            ticket_id: ticket.id,
+            status_from: ticket.status,
+            status_to: ticket.status,
+            changed_by: session.user.id,
+            notes: `STOP CLOCK REQUEST (butuh L1): ${reason}`,
+            photo_url: [],
+          },
+        });
+      });
+
+      void import("@/lib/notifications").then(({ notifyStopClockApprovalRequest }) =>
+        notifyStopClockApprovalRequest({
+          id: ticket.id,
+          ticket_no: ticket.ticket_no,
+          reason,
+        })
+      );
+
+      revalidatePath("/admin/tickets");
+      revalidatePath(`/admin/tickets/${ticket.id}`);
+      revalidatePath("/admin/routing");
+      return { success: true, data: { pending_approval: true } };
+    }
+
+    const approvedByApprover = canApproveStopClock(session.user.role);
+
     await prisma.$transaction(async (tx) => {
       await tx.ticket.update({
         where: { id: ticket.id },
         data: {
           sla_paused_at: now,
           stop_clock_reason: reason,
+          stop_clock_approval_status: approvedByApprover ? "APPROVED" : null,
+          stop_clock_requested_at: null,
+          stop_clock_requested_by: null,
+          stop_clock_approved_by: approvedByApprover ? session.user.id : null,
+          stop_clock_approved_at: approvedByApprover ? now : null,
         },
       });
       await tx.ticketLog.create({
@@ -438,11 +493,140 @@ export async function pauseSlaClockAction(input: {
     revalidatePath("/admin/tickets");
     revalidatePath(`/admin/tickets/${ticket.id}`);
     revalidatePath("/admin/routing");
-    return { success: true };
+    return { success: true, data: { pending_approval: false } };
   } catch (e) {
     return {
       success: false,
       error: e instanceof Error ? e.message : "Gagal stop clock",
+    };
+  }
+}
+
+export async function approveStopClockAction(input: {
+  ticket_id: string;
+  notes?: string | null;
+}): Promise<ActionResult> {
+  try {
+    const session = await requireAdmin();
+    const { canApproveStopClock } = await import("@/lib/stop-clock");
+    if (!canApproveStopClock(session.user.role)) {
+      return { success: false, error: "Hanya L1 / Admin yang boleh approve" };
+    }
+
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: input.ticket_id },
+    });
+    if (!ticket) return { success: false, error: "Ticket tidak ditemukan" };
+    if (ticket.stop_clock_approval_status !== "PENDING") {
+      return { success: false, error: "Tidak ada request stop clock pending" };
+    }
+    if (ticket.sla_paused_at) {
+      return { success: false, error: "SLA sudah di-pause" };
+    }
+    if (!ticket.sla_due_at) {
+      return { success: false, error: "Ticket tidak punya SLA due" };
+    }
+
+    const reason = ticket.stop_clock_reason ?? "Approved by L1";
+    const now = new Date();
+
+    await prisma.$transaction(async (tx) => {
+      await tx.ticket.update({
+        where: { id: ticket.id },
+        data: {
+          sla_paused_at: now,
+          stop_clock_approval_status: "APPROVED",
+          stop_clock_approved_by: session.user.id,
+          stop_clock_approved_at: now,
+        },
+      });
+      await tx.ticketLog.create({
+        data: {
+          ticket_id: ticket.id,
+          status_from: ticket.status,
+          status_to: ticket.status,
+          changed_by: session.user.id,
+          notes:
+            input.notes?.trim() ||
+            `STOP CLOCK APPROVED: ${reason}`,
+          photo_url: [],
+        },
+      });
+    });
+
+    void import("@/lib/notifications").then(({ notifyStopClock }) =>
+      notifyStopClock({
+        id: ticket.id,
+        ticket_no: ticket.ticket_no,
+        paused: true,
+        reason,
+        engineerId: ticket.assigned_engineer_id,
+      })
+    );
+
+    revalidatePath("/admin/tickets");
+    revalidatePath(`/admin/tickets/${ticket.id}`);
+    revalidatePath("/admin/routing");
+    return { success: true };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Gagal approve stop clock",
+    };
+  }
+}
+
+export async function rejectStopClockAction(input: {
+  ticket_id: string;
+  notes?: string | null;
+}): Promise<ActionResult> {
+  try {
+    const session = await requireAdmin();
+    const { canApproveStopClock } = await import("@/lib/stop-clock");
+    if (!canApproveStopClock(session.user.role)) {
+      return { success: false, error: "Hanya L1 / Admin yang boleh reject" };
+    }
+
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: input.ticket_id },
+    });
+    if (!ticket) return { success: false, error: "Ticket tidak ditemukan" };
+    if (ticket.stop_clock_approval_status !== "PENDING") {
+      return { success: false, error: "Tidak ada request stop clock pending" };
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.ticket.update({
+        where: { id: ticket.id },
+        data: {
+          stop_clock_approval_status: "REJECTED",
+          stop_clock_reason: null,
+          stop_clock_approved_by: session.user.id,
+          stop_clock_approved_at: new Date(),
+        },
+      });
+      await tx.ticketLog.create({
+        data: {
+          ticket_id: ticket.id,
+          status_from: ticket.status,
+          status_to: ticket.status,
+          changed_by: session.user.id,
+          notes:
+            input.notes?.trim() ||
+            "STOP CLOCK REJECTED oleh L1",
+          photo_url: [],
+        },
+      });
+    });
+
+    revalidatePath("/admin/tickets");
+    revalidatePath(`/admin/tickets/${ticket.id}`);
+    revalidatePath("/admin/routing");
+    return { success: true };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Gagal reject stop clock",
     };
   }
 }
@@ -474,6 +658,9 @@ export async function resumeSlaClockAction(input: {
           sla_paused_at: null,
           sla_paused_total_ms: resumed.sla_paused_total_ms,
           stop_clock_reason: null,
+          stop_clock_approval_status: null,
+          stop_clock_requested_at: null,
+          stop_clock_requested_by: null,
         },
       });
       await tx.ticketLog.create({

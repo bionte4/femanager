@@ -726,34 +726,36 @@ async function main() {
     }
   }
 
-  console.log("→ Knowledge Base SDWAN...");
-  const kbItems = [
-    {
-      title: "Cara Install Router SDWAN Telkom",
-      category: "SDWAN",
-      content:
-        "1. Siapkan router & dus, foto SN.\n2. Pasang di rack, foto sebelum/sesudah.\n3. Hubungkan Link1 & Link2 ISP.\n4. Login dashboard, pastikan tunnel hijau.\n5. Test ping & failover.\n6. Speedtest + foto Tunnel ID.",
-      video_url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-    },
-    {
-      title: "Troubleshoot Tunnel Down",
-      category: "SDWAN",
-      content:
-        "1. Cek LED WAN/LAN.\n2. Cek log tunnel di dashboard.\n3. Ping controller.\n4. Restart router jika perlu.\n5. Cek kabel & ISP link.",
-    },
-    {
-      title: "Cara Test Failover",
-      category: "SDWAN",
-      content:
-        "1. Pastikan kedua link UP.\n2. Cabut Link1 — traffic harus pindah ke Link2 tanpa putus.\n3. Pasang kembali Link1.\n4. Dokumentasikan latency & screenshot.",
-    },
-  ];
+  console.log("→ Knowledge Base (SOP lapangan)...");
+  const { KNOWLEDGE_BASE_SEED } = await import("./seed-knowledge-base");
+  const kbItems = KNOWLEDGE_BASE_SEED;
   for (const kb of kbItems) {
     const existing = await prisma.knowledgeBase.findFirst({
       where: { title: kb.title },
     });
     if (!existing) {
-      await prisma.knowledgeBase.create({ data: kb });
+      await prisma.knowledgeBase.create({
+        data: {
+          title: kb.title,
+          category: kb.category,
+          content: kb.content,
+          video_url: kb.video_url ?? null,
+          file_url: kb.file_url ?? null,
+          is_active: true,
+        },
+      });
+    } else {
+      // Update konten seed agar revisi SOP ikut ter-refresh (idempotent by title)
+      await prisma.knowledgeBase.update({
+        where: { id: existing.id },
+        data: {
+          category: kb.category,
+          content: kb.content,
+          video_url: kb.video_url ?? null,
+          file_url: kb.file_url ?? existing.file_url,
+          is_active: true,
+        },
+      });
     }
   }
 
@@ -816,7 +818,7 @@ async function main() {
   console.log(`   Integration API key: ${demoApiKey}`);
   console.log(`   Commission rules: ${commissionRules.length}`);
   console.log(`   Fraud logs demo: lihat /admin/fraud-center`);
-  console.log(`   KB SDWAN: ${kbItems.length} artikel`);
+  console.log(`   KB: ${kbItems.length} artikel (EDC/SDWAN/LAN/WAN/WIFI/…)`);
 }
 
 main()

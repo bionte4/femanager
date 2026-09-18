@@ -329,7 +329,10 @@ export function EngineerTicketActions({
       async () => {
         if (sparepartId) {
           const { consumeSparepart } = await import("@/app/actions/spareparts");
-          const consumed = await consumeSparepart(sparepartId, 1);
+          const consumed = await consumeSparepart(sparepartId, 1, {
+            ticket_id: ticketId,
+            notes: `Escalate: ${escalateReason.trim()}`,
+          });
           if (!consumed.success) {
             return { success: false, error: consumed.error };
           }

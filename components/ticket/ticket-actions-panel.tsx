@@ -6,7 +6,9 @@ import type { TicketStatus } from "@prisma/client";
 import { Loader2, Pause, Play, ArrowUpRight } from "lucide-react";
 import {
   assignEngineerAction,
+  approveStopClockAction,
   pauseSlaClockAction,
+  rejectStopClockAction,
   resumeSlaClockAction,
   updateTicketStatusAction,
 } from "@/app/actions/tickets";
@@ -57,7 +59,9 @@ export function TicketActionsPanel({
   engineers,
   slaPausedAt,
   stopClockReason,
+  stopClockApprovalStatus,
   canEscalateL0,
+  canApproveStopClock,
 }: {
   ticketId: string;
   ticketNo?: string;
@@ -66,7 +70,9 @@ export function TicketActionsPanel({
   engineers: EngineerOption[];
   slaPausedAt?: Date | string | null;
   stopClockReason?: string | null;
+  stopClockApprovalStatus?: string | null;
   canEscalateL0?: boolean;
+  canApproveStopClock?: boolean;
 }) {
   const router = useRouter();
   const [engineerId, setEngineerId] = useState(assignedEngineerId ?? "");
@@ -75,12 +81,20 @@ export function TicketActionsPanel({
   const [stopReason, setStopReason] = useState("");
   const [handoverOpen, setHandoverOpen] = useState(false);
   const [loading, setLoading] = useState<
-    "assign" | "status" | "pause" | "resume" | "escalate" | null
+    | "assign"
+    | "status"
+    | "pause"
+    | "resume"
+    | "escalate"
+    | "approve"
+    | "reject"
+    | null
   >(null);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
 
   const isPaused = !!slaPausedAt;
+  const pendingApproval = stopClockApprovalStatus === "PENDING";
 
   async function handleAssign() {
     if (!engineerId) {
@@ -137,7 +151,11 @@ export function TicketActionsPanel({
       setError(result.error);
       return;
     }
-    setOk("Stop clock aktif — SLA dibekukan");
+    setOk(
+      result.data?.pending_approval
+        ? "Request stop clock dikirim — menunggu approve L1"
+        : "Stop clock aktif — SLA dibekukan"
+    );
     setStopReason("");
     router.refresh();
   }
@@ -156,6 +174,34 @@ export function TicketActionsPanel({
       return;
     }
     setOk("SLA countdown dilanjutkan");
+    router.refresh();
+  }
+
+  async function handleApproveStop() {
+    setLoading("approve");
+    setError(null);
+    setOk(null);
+    const result = await approveStopClockAction({ ticket_id: ticketId });
+    setLoading(null);
+    if (!result.success) {
+      setError(result.error);
+      return;
+    }
+    setOk("Stop clock disetujui & diaktifkan");
+    router.refresh();
+  }
+
+  async function handleRejectStop() {
+    setLoading("reject");
+    setError(null);
+    setOk(null);
+    const result = await rejectStopClockAction({ ticket_id: ticketId });
+    setLoading(null);
+    if (!result.success) {
+      setError(result.error);
+      return;
+    }
+    setOk("Request stop clock ditolak");
     router.refresh();
   }
 
@@ -198,7 +244,52 @@ export function TicketActionsPanel({
                   Paused
                 </span>
               )}
+              {pendingApproval && !isPaused && (
+                <span className="text-[10px] font-medium uppercase tracking-wide text-amber-700">
+                  Pending L1
+                </span>
+              )}
             </div>
+
+            {pendingApproval && !isPaused && (
+              <div className="space-y-2 rounded-md bg-amber-50 p-2">
+                <p className="text-xs text-amber-900">
+                  Pause bank sudah di atas threshold — butuh approve L1.
+                </p>
+                {stopClockReason && (
+                  <p className="text-xs text-muted-foreground">{stopClockReason}</p>
+                )}
+                {canApproveStopClock ? (
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      className="flex-1"
+                      onClick={handleApproveStop}
+                      disabled={loading === "approve"}
+                    >
+                      {loading === "approve" ? (
+                        <Loader2 className="animate-spin" />
+                      ) : null}
+                      Approve
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={handleRejectStop}
+                      disabled={loading === "reject"}
+                    >
+                      Reject
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground">
+                    Menunggu keputusan L1…
+                  </p>
+                )}
+              </div>
+            )}
+
             {isPaused ? (
               <>
                 {stopClockReason && (
@@ -219,27 +310,29 @@ export function TicketActionsPanel({
                 </Button>
               </>
             ) : (
-              <>
-                <textarea
-                  className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder="Alasan pause (wajib, min 5 karakter)"
-                  value={stopReason}
-                  onChange={(e) => setStopReason(e.target.value)}
-                />
-                <Button
-                  variant="outline"
-                  onClick={handlePause}
-                  disabled={loading === "pause"}
-                  className="w-full"
-                >
-                  {loading === "pause" ? (
-                    <Loader2 className="animate-spin" />
-                  ) : (
-                    <Pause className="h-4 w-4" />
-                  )}
-                  Stop Clock
-                </Button>
-              </>
+              !pendingApproval && (
+                <>
+                  <textarea
+                    className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    placeholder="Alasan pause (wajib, min 5 karakter)"
+                    value={stopReason}
+                    onChange={(e) => setStopReason(e.target.value)}
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={handlePause}
+                    disabled={loading === "pause"}
+                    className="w-full"
+                  >
+                    {loading === "pause" ? (
+                      <Loader2 className="animate-spin" />
+                    ) : (
+                      <Pause className="h-4 w-4" />
+                    )}
+                    Stop Clock
+                  </Button>
+                </>
+              )
             )}
           </div>
 

@@ -15,6 +15,7 @@ import {
   type HandoverFormValue,
 } from "@/components/ticket/handover-form";
 import { PriorityBadge, TicketStatusBadge } from "@/components/ticket/status-badge";
+import { AcceptCountdown } from "@/components/sla-countdown/accept-countdown";
 import { SLACountdown } from "@/components/sla-countdown/sla-countdown";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -38,15 +39,20 @@ type QueueTicket = {
   sla_paused_at: Date | string | null;
   sla_paused_total_ms: number;
   escalated_to_l1_at: Date | string | null;
+  last_assigned_at?: Date | string | null;
+  accepted_at?: Date | string | null;
   created_at: Date | string;
   tenant: { name: string; code: string; city: string | null };
   device: { type: string; serial_number: string } | null;
   assigned_engineer: { full_name: string } | null;
 };
 
+type TabKey = "l0" | "l1" | "accept";
+
 export function RoutingQueuesClient({
   l0,
   l1,
+  accept,
   counts,
   canEscalate,
   canClaimL1,
@@ -54,17 +60,18 @@ export function RoutingQueuesClient({
 }: {
   l0: QueueTicket[];
   l1: QueueTicket[];
-  counts: { l0: number; l1: number };
+  accept: QueueTicket[];
+  counts: { l0: number; l1: number; accept: number };
   canEscalate: boolean;
   canClaimL1: boolean;
-  initialTab: "l0" | "l1";
+  initialTab: TabKey;
 }) {
   const router = useRouter();
-  const [tab, setTab] = useState<"l0" | "l1">(initialTab);
+  const [tab, setTab] = useState<TabKey>(initialTab);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [handoverTicket, setHandoverTicket] = useState<QueueTicket | null>(null);
 
-  const rows = tab === "l0" ? l0 : l1;
+  const rows = tab === "l0" ? l0 : tab === "l1" ? l1 : accept;
 
   async function onEscalate(handover: HandoverFormValue) {
     if (!handoverTicket) return;
@@ -105,44 +112,49 @@ export function RoutingQueuesClient({
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Routing Queue</h1>
         <p className="text-xs text-muted-foreground">
-          L0 standby & escalate (wajib handover) · L1 cek device & assign FE
+          L0 standby & escalate · L1 assign FE · Accept countdown 15 menit
         </p>
       </div>
 
-      <div className="flex w-fit gap-1 rounded-md border bg-muted/40 p-0.5">
-        <button
-          type="button"
-          onClick={() => setTab("l0")}
-          className={cn(
-            "rounded px-3 py-1.5 text-xs font-medium transition-colors",
-            tab === "l0"
-              ? "bg-background shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          L0 Inbox ({counts.l0})
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab("l1")}
-          className={cn(
-            "rounded px-3 py-1.5 text-xs font-medium transition-colors",
-            tab === "l1"
-              ? "bg-background shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          L1 Queue ({counts.l1})
-        </button>
+      <div className="flex w-fit flex-wrap gap-1 rounded-md border bg-muted/40 p-0.5">
+        {(
+          [
+            ["l0", `L0 Inbox (${counts.l0})`],
+            ["l1", `L1 Queue (${counts.l1})`],
+            ["accept", `Waiting Accept (${counts.accept})`],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setTab(key)}
+            className={cn(
+              "rounded px-3 py-1.5 text-xs font-medium transition-colors",
+              tab === key
+                ? "bg-background shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       {rows.length === 0 ? (
         <EmptyState
-          title={tab === "l0" ? "Inbox L0 kosong" : "Antrian L1 kosong"}
+          title={
+            tab === "l0"
+              ? "Inbox L0 kosong"
+              : tab === "l1"
+                ? "Antrian L1 kosong"
+                : "Tidak ada job menunggu accept"
+          }
           description={
             tab === "l0"
               ? "Tidak ada ticket OPEN / ESCALATED yang menunggu."
-              : "Tidak ada ticket PENDING_L1."
+              : tab === "l1"
+                ? "Tidak ada ticket PENDING_L1."
+                : "Semua ASSIGNED sudah di-accept FE, atau belum ada assign."
           }
         />
       ) : (
@@ -153,7 +165,7 @@ export function RoutingQueuesClient({
                 <TableHead>Ticket</TableHead>
                 <TableHead>Tenant</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>SLA</TableHead>
+                <TableHead>{tab === "accept" ? "Accept" : "SLA"}</TableHead>
                 <TableHead className="w-36" />
               </TableRow>
             </TableHeader>
@@ -195,12 +207,19 @@ export function RoutingQueuesClient({
                     )}
                   </TableCell>
                   <TableCell>
-                    <SLACountdown
-                      dueAt={t.sla_due_at}
-                      pausedAt={t.sla_paused_at}
-                      pausedTotalMs={t.sla_paused_total_ms}
-                      compact
-                    />
+                    {tab === "accept" ? (
+                      <AcceptCountdown
+                        lastAssignedAt={t.last_assigned_at}
+                        compact
+                      />
+                    ) : (
+                      <SLACountdown
+                        dueAt={t.sla_due_at}
+                        pausedAt={t.sla_paused_at}
+                        pausedTotalMs={t.sla_paused_total_ms}
+                        compact
+                      />
+                    )}
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-1">
