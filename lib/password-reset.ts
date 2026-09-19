@@ -45,25 +45,36 @@ function safeEqualHex(a: string, b: string): boolean {
   }
 }
 
+export type OtpChannel = "whatsapp" | "telegram";
+
 export type RequestOtpResult =
-  | { ok: true; message: string; debug_code?: string }
+  | { ok: true; message: string; debug_code?: string; channel: OtpChannel }
   | { ok: false; error: string };
 
 export async function requestPasswordResetOtp(
-  phoneRaw: string
+  phoneRaw: string,
+  channel: OtpChannel = "whatsapp"
 ): Promise<RequestOtpResult> {
   const phone62 = normalizePhoneId(phoneRaw);
   if (phone62.length < 11) {
     return { ok: false, error: "Nomor HP tidak valid" };
   }
 
-  const user = await findUserByPhoneFlexible(phoneRaw);
+  const channelLabel = channel === "telegram" ? "Telegram" : "WhatsApp";
   // Jangan bocorkan apakah nomor terdaftar
-  const genericOk =
-    "Jika nomor terdaftar, kode OTP dikirim via WhatsApp (berlaku 10 menit).";
+  const genericOk = `Jika nomor terdaftar, kode OTP dikirim via ${channelLabel} (berlaku 10 menit).`;
 
+  const user = await findUserByPhoneFlexible(phoneRaw);
   if (!user || user.is_suspended) {
-    return { ok: true, message: genericOk };
+    return { ok: true, message: genericOk, channel };
+  }
+
+  if (channel === "telegram" && !user.telegram_chat_id?.trim()) {
+    return {
+      ok: false,
+      error:
+        "Akun ini belum punya Telegram Chat ID. Pilih WhatsApp, atau minta admin mengisi Chat ID di profil.",
+    };
   }
 
   const since = new Date(Date.now() - 60 * 60 * 1000);
@@ -89,38 +100,48 @@ export async function requestPasswordResetOtp(
     },
   });
 
-  const wa = await sendWhatsApp({
-    phone: user.phone,
-    message: `FE-Track: kode OTP reset password Anda adalah *${code}*. Berlaku 10 menit. Jangan bagikan ke siapa pun.`,
-  });
+  const otpMsg = `FE-Track: kode OTP reset password Anda adalah ${code}. Berlaku 10 menit. Jangan bagikan ke siapa pun.`;
 
-  let tgOk = false;
-  if (user.telegram_chat_id?.trim()) {
+  if (channel === "telegram") {
     const { sendTelegram } = await import("@/lib/telegram");
     const tg = await sendTelegram({
-      chat_id: user.telegram_chat_id.trim(),
-      message: `FE-Track: kode OTP reset password Anda adalah ${code}. Berlaku 10 menit. Jangan bagikan ke siapa pun.`,
+      chat_id: user.telegram_chat_id!.trim(),
+      message: otpMsg,
     });
-    tgOk = tg.success && !tg.skipped;
-  }
-
-  const waOk = wa.success && !wa.skipped;
-  if (!waOk && !tgOk) {
-    if (wa.skipped && !tgOk) {
+    if (tg.skipped) {
       return {
         ok: false,
         error:
-          "WhatsApp/Telegram belum siap. Set Fonnte atau Telegram di Integrations, dan isi Telegram Chat ID di profil engineer.",
+          "Telegram belum aktif. Aktifkan bot di Settings → Integrations, lalu coba lagi.",
       };
     }
-    return {
-      ok: false,
-      error: wa.error || "Gagal kirim OTP. Coba lagi atau hubungi admin.",
-    };
+    if (!tg.success) {
+      return {
+        ok: false,
+        error: tg.error || "Gagal kirim OTP Telegram. Coba WhatsApp atau hubungi admin.",
+      };
+    }
+  } else {
+    const wa = await sendWhatsApp({
+      phone: user.phone,
+      message: `FE-Track: kode OTP reset password Anda adalah *${code}*. Berlaku 10 menit. Jangan bagikan ke siapa pun.`,
+    });
+    if (wa.skipped) {
+      return {
+        ok: false,
+        error:
+          "WhatsApp belum siap. Set gateway di Settings → Integrations, atau pilih Telegram.",
+      };
+    }
+    if (!wa.success) {
+      return {
+        ok: false,
+        error: wa.error || "Gagal kirim OTP WhatsApp. Coba Telegram atau hubungi admin.",
+      };
+    }
   }
 
-  const result: RequestOtpResult = { ok: true, message: genericOk };
-  // Hanya tampilkan kode di non-production untuk uji tanpa WA
+  const result: RequestOtpResult = { ok: true, message: genericOk, channel };
   if (process.env.NODE_ENV !== "production" && process.env.OTP_DEBUG === "1") {
     result.debug_code = code;
   }

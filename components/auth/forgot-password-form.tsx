@@ -8,9 +8,11 @@ import {
   requestPasswordOtpAction,
   resetPasswordWithOtpAction,
 } from "@/app/actions/password-reset";
+import type { OtpChannel } from "@/lib/password-reset";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 
 type Step = "phone" | "reset";
 
@@ -18,6 +20,7 @@ export function ForgotPasswordForm() {
   const router = useRouter();
   const [step, setStep] = useState<Step>("phone");
   const [phone, setPhone] = useState("");
+  const [channel, setChannel] = useState<OtpChannel>("whatsapp");
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -25,6 +28,7 @@ export function ForgotPasswordForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [debugCode, setDebugCode] = useState<string | null>(null);
+  const [sentVia, setSentVia] = useState<OtpChannel>("whatsapp");
 
   async function onRequestOtp(e: React.FormEvent) {
     e.preventDefault();
@@ -33,11 +37,15 @@ export function ForgotPasswordForm() {
     setDebugCode(null);
     setLoading(true);
     try {
-      const res = await requestPasswordOtpAction({ phone: phone.trim() });
+      const res = await requestPasswordOtpAction({
+        phone: phone.trim(),
+        channel,
+      });
       if (!res.success) {
         setError(res.error);
         return;
       }
+      setSentVia(res.channel ?? channel);
       setMessage(res.message ?? "OTP dikirim.");
       if (res.debug_code) setDebugCode(res.debug_code);
       setStep("reset");
@@ -69,6 +77,8 @@ export function ForgotPasswordForm() {
     }
   }
 
+  const channelLabel = sentVia === "telegram" ? "Telegram" : "WhatsApp";
+
   return (
     <div className="space-y-5">
       {step === "phone" ? (
@@ -88,8 +98,40 @@ export function ForgotPasswordForm() {
                 required
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Kirim OTP via</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setChannel("whatsapp")}
+                className={cn(
+                  "rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors",
+                  channel === "whatsapp"
+                    ? "border-emerald-600 bg-emerald-50 text-emerald-900"
+                    : "border-border bg-background text-muted-foreground hover:bg-muted/50"
+                )}
+              >
+                WhatsApp
+              </button>
+              <button
+                type="button"
+                onClick={() => setChannel("telegram")}
+                className={cn(
+                  "rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors",
+                  channel === "telegram"
+                    ? "border-sky-600 bg-sky-50 text-sky-900"
+                    : "border-border bg-background text-muted-foreground hover:bg-muted/50"
+                )}
+              >
+                Telegram
+              </button>
+            </div>
             <p className="text-xs text-muted-foreground">
-              Kode OTP dikirim via WhatsApp ke nomor akun.
+              {channel === "telegram"
+                ? "OTP dikirim ke Telegram Chat ID yang terdaftar di profil akun."
+                : "OTP dikirim via WhatsApp ke nomor akun."}
             </p>
           </div>
 
@@ -105,6 +147,8 @@ export function ForgotPasswordForm() {
                 <Loader2 className="animate-spin" />
                 Mengirim...
               </>
+            ) : channel === "telegram" ? (
+              "Kirim OTP Telegram"
             ) : (
               "Kirim OTP WhatsApp"
             )}
@@ -113,7 +157,8 @@ export function ForgotPasswordForm() {
       ) : (
         <form onSubmit={onReset} className="space-y-5">
           <p className="text-sm text-muted-foreground">
-            OTP dikirim ke <span className="font-medium text-foreground">{phone}</span>
+            OTP dikirim via {channelLabel} ke{" "}
+            <span className="font-medium text-foreground">{phone}</span>
           </p>
 
           <div className="space-y-2">

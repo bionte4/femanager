@@ -2,7 +2,7 @@ import { ForgotPasswordForm } from "@/components/auth/forgot-password-form";
 
 export const metadata = {
   title: "Lupa Password | FE-Track",
-  description: "Reset password via OTP WhatsApp",
+  description: "Reset password via OTP WhatsApp atau Telegram",
 };
 
 export default function ForgotPasswordPage() {
@@ -23,7 +23,7 @@ export default function ForgotPasswordPage() {
               FE-Track
             </p>
             <p className="mt-2 text-sm text-emerald-100/70">
-              Reset password dengan kode OTP WhatsApp
+              Reset password dengan kode OTP WhatsApp atau Telegram
             </p>
           </div>
 
@@ -32,7 +32,8 @@ export default function ForgotPasswordPage() {
               Lupa password
             </h1>
             <p className="mb-6 text-sm text-muted-foreground">
-              Masukkan nomor HP akun. Kami kirim OTP ke WhatsApp.
+              Masukkan nomor HP akun, lalu pilih kirim OTP via WhatsApp atau
+              Telegram.
             </p>
             <ForgotPasswordForm />
           </div>

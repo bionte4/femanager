@@ -4,14 +4,21 @@ import { z } from "zod";
 import {
   requestPasswordResetOtp,
   resetPasswordWithOtp,
+  type OtpChannel,
 } from "@/lib/password-reset";
 
 type ActionResult =
-  | { success: true; message?: string; debug_code?: string }
+  | {
+      success: true;
+      message?: string;
+      debug_code?: string;
+      channel?: OtpChannel;
+    }
   | { success: false; error: string };
 
 const phoneSchema = z.object({
   phone: z.string().min(10).max(20),
+  channel: z.enum(["whatsapp", "telegram"]).default("whatsapp"),
 });
 
 const resetSchema = z.object({
@@ -23,18 +30,23 @@ const resetSchema = z.object({
 
 export async function requestPasswordOtpAction(input: {
   phone: string;
+  channel?: OtpChannel;
 }): Promise<ActionResult> {
   const parsed = phoneSchema.safeParse(input);
   if (!parsed.success) {
     return { success: false, error: "Nomor HP tidak valid" };
   }
 
-  const res = await requestPasswordResetOtp(parsed.data.phone);
+  const res = await requestPasswordResetOtp(
+    parsed.data.phone,
+    parsed.data.channel
+  );
   if (!res.ok) return { success: false, error: res.error };
   return {
     success: true,
     message: res.message,
     debug_code: res.debug_code,
+    channel: res.channel,
   };
 }
 
