@@ -2,7 +2,6 @@ import {
   DeviceType,
   SlaTier,
   TicketStatus,
-  TicketType,
   TransactionType,
   type Ticket,
   type Tenant,
@@ -100,11 +99,6 @@ export async function findBestCommissionRule(ticket: TicketForCommission) {
   if (!best && deviceType?.startsWith("EDC")) {
     for (const rule of rules) {
       if (rule.device_type?.startsWith("EDC")) {
-        const score = ruleScore(
-          { device_type: null, sla_tier: rule.sla_tier },
-          null,
-          slaTier
-        );
         // Manual: allow EDC_BCA rule for EDC_BRI if tier matches
         if (rule.sla_tier != null && rule.sla_tier !== slaTier) continue;
         const s = (rule.sla_tier != null ? 1 : 0) + 1;

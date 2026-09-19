@@ -73,7 +73,8 @@ export default async function EngineerWalletPage() {
   }
 
   const wallet = await getMyWallet();
-  const { pkwt_restricted: _restricted, ...clientWallet } = wallet;
+  const { pkwt_restricted: _, ...clientWallet } = wallet;
+  void _;
 
   return (
     <div className="space-y-4">

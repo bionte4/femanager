@@ -87,7 +87,7 @@ type TrustRow = {
   fraud_low: number;
 };
 
-const TABS = ["logs", "pending", "trust"] as const;
+type FraudTab = "logs" | "pending" | "trust";
 
 function severityBadge(sev: string) {
   if (sev === "HIGH") return <Badge variant="destructive">HIGH</Badge>;
@@ -162,7 +162,7 @@ export function FraudCenterClient({
   trust: TrustRow[];
 }) {
   const router = useRouter();
-  const [tab, setTab] = useState<(typeof TABS)[number]>("logs");
+  const [tab, setTab] = useState<FraudTab>("logs");
   const [sevFilter, setSevFilter] = useState<string>("ALL");
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
   const [busy, setBusy] = useState<string | null>(null);

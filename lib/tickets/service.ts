@@ -77,7 +77,7 @@ export async function createTicketRecord(params: CreateTicketParams) {
   }
 
   let serviceCategoryId = params.service_category_id || null;
-  let servicePackageId = params.service_package_id || null;
+  const servicePackageId = params.service_package_id || null;
   let requiredEngineers = params.required_engineers ?? 1;
   let description = params.description;
 

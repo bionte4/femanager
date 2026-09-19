@@ -137,9 +137,6 @@ export async function checkFastCheckin(ticketId: string): Promise<CreatedFraud[]
 
   const onSite = ticket.logs.find((l) => l.status_to === TicketStatus.ON_SITE);
   const onWay = ticket.logs.find((l) => l.status_to === TicketStatus.ON_THE_WAY);
-  const resolved =
-    ticket.logs.find((l) => l.status_to === TicketStatus.RESOLVED) ||
-    ticket.logs[ticket.logs.length - 1];
 
   if (onSite && ticket.resolved_at) {
     const durMin =
