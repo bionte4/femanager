@@ -19,7 +19,12 @@ export function EngineerLogoutButton({
       variant={variant}
       size="sm"
       className={className}
-      onClick={() => void signOut({ callbackUrl: "/login" })}
+      onClick={() => {
+        void (async () => {
+          await signOut({ redirect: false });
+          window.location.assign("/login");
+        })();
+      }}
     >
       <LogOut className="mr-1.5 h-3.5 w-3.5" />
       {label}

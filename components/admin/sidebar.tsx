@@ -265,7 +265,12 @@ export function AdminSidebar({ userName, userRole }: AdminSidebarProps) {
             variant="ghost"
             size="sm"
             className="h-8 w-full justify-start gap-2 px-2.5 text-[12px] leading-snug text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-            onClick={() => signOut({ callbackUrl: "/login" })}
+            onClick={() => {
+              void (async () => {
+                await signOut({ redirect: false });
+                window.location.assign("/login");
+              })();
+            }}
           >
             <LogOut className="h-3.5 w-3.5 shrink-0" />
             Keluar
