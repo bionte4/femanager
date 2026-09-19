@@ -12,6 +12,7 @@ import {
   BarChart3,
   Settings,
   Package,
+  Warehouse,
   Plug,
   Wallet,
   ShieldAlert,
@@ -92,6 +93,12 @@ const NAV_GROUPS: NavGroup[] = [
         href: "/admin/service-categories",
         label: "Kategori",
         icon: Layers,
+        roles: MASTER_ROLES,
+      },
+      {
+        href: "/admin/warehouses",
+        label: "Gudang",
+        icon: Warehouse,
         roles: MASTER_ROLES,
       },
       {

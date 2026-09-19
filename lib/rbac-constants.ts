@@ -68,6 +68,7 @@ export const ADMIN_PATH_ROLE_RULES: {
   { prefix: "/admin/devices", roles: MASTER_ROLES },
   { prefix: "/admin/service-categories", roles: MASTER_ROLES },
   { prefix: "/admin/spareparts", roles: MASTER_ROLES },
+  { prefix: "/admin/warehouses", roles: MASTER_ROLES },
   { prefix: "/admin/hr", roles: HR_ROLES },
   { prefix: "/admin/payroll", roles: PAYROLL_ROLES },
   { prefix: "/admin/integrations", roles: SYSTEM_ROLES },

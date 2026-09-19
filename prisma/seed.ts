@@ -478,6 +478,28 @@ async function main() {
     });
   }
 
+  console.log("→ Warehouses...");
+  const hqWarehouse = await prisma.warehouse.upsert({
+    where: { code: "HQ" },
+    update: { name: "Gudang Pusat", city: "Jakarta", is_active: true },
+    create: {
+      code: "HQ",
+      name: "Gudang Pusat",
+      city: "Jakarta",
+      is_active: true,
+    },
+  });
+  await prisma.warehouse.upsert({
+    where: { code: "BDG" },
+    update: {},
+    create: {
+      code: "BDG",
+      name: "Gudang Bandung",
+      city: "Bandung",
+      is_active: true,
+    },
+  });
+
   console.log("→ Spareparts...");
   const spareparts = [
     { name: "EDC BCA Ingenico iCT250", sku: "EDC-BCA-ICT250", stock_qty: 25, location_type: LocationType.WAREHOUSE },
@@ -491,26 +513,46 @@ async function main() {
   ];
 
   for (const s of spareparts) {
-    await prisma.sparepart.upsert({
-      where: { sku: s.sku },
-      update: { stock_qty: s.stock_qty, name: s.name },
-      create: s,
+    const existing = await prisma.sparepart.findFirst({
+      where: {
+        sku: s.sku,
+        location_type: LocationType.WAREHOUSE,
+        warehouse_id: hqWarehouse.id,
+      },
     });
+    if (existing) {
+      await prisma.sparepart.update({
+        where: { id: existing.id },
+        data: { stock_qty: s.stock_qty, name: s.name },
+      });
+    } else {
+      await prisma.sparepart.create({
+        data: { ...s, warehouse_id: hqWarehouse.id },
+      });
+    }
   }
 
   // Sample spare di engineer pertama
   if (engineerIds[0]) {
-    await prisma.sparepart.upsert({
-      where: { sku: "EDC-BCA-FIELD-01" },
-      update: {},
-      create: {
-        name: "EDC BCA Cadangan Field",
-        sku: "EDC-BCA-FIELD-01",
-        stock_qty: 2,
+    const fieldSku = "EDC-BCA-FIELD-01";
+    const existingField = await prisma.sparepart.findFirst({
+      where: {
+        sku: fieldSku,
         location_type: LocationType.ENGINEER,
         holder_id: engineerIds[0],
       },
     });
+    if (!existingField) {
+      await prisma.sparepart.create({
+        data: {
+          name: "EDC BCA Cadangan Field",
+          sku: fieldSku,
+          stock_qty: 2,
+          location_type: LocationType.ENGINEER,
+          holder_id: engineerIds[0],
+        },
+      });
+    }
   }
 
   // Tenant khusus untuk demo Open API (sesuai curl PROMPT 10)

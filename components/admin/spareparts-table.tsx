@@ -45,11 +45,24 @@ type SparepartRow = {
   sku: string;
   stock_qty: number;
   location_type: LocationType;
+  warehouse_id: string | null;
   holder_id: string | null;
   holder: { id: string; full_name: string; phone: string } | null;
+  warehouse: {
+    id: string;
+    code: string;
+    name: string;
+    city: string | null;
+  } | null;
 };
 
 type EngineerOption = { id: string; full_name: string };
+type WarehouseOption = {
+  id: string;
+  code: string;
+  name: string;
+  city: string | null;
+};
 
 type MutationRow = {
   id: string;
@@ -66,11 +79,14 @@ type MutationRow = {
 export function SparepartsTable({
   items,
   engineers,
+  warehouses,
 }: {
   items: SparepartRow[];
   engineers: EngineerOption[];
+  warehouses: WarehouseOption[];
 }) {
   const router = useRouter();
+  const defaultWh = warehouses[0]?.id ?? "";
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<SparepartRow | null>(null);
   const [saving, setSaving] = useState(false);
@@ -79,6 +95,7 @@ export function SparepartsTable({
     sku: "",
     stock_qty: "0",
     location_type: "WAREHOUSE" as LocationType,
+    warehouse_id: defaultWh,
     holder_id: "",
   });
   const [historyFor, setHistoryFor] = useState<SparepartRow | null>(null);
@@ -92,6 +109,7 @@ export function SparepartsTable({
       sku: "",
       stock_qty: "10",
       location_type: "WAREHOUSE",
+      warehouse_id: defaultWh,
       holder_id: "",
     });
     setOpen(true);
@@ -104,6 +122,7 @@ export function SparepartsTable({
       sku: row.sku,
       stock_qty: String(row.stock_qty),
       location_type: row.location_type,
+      warehouse_id: row.warehouse_id ?? defaultWh,
       holder_id: row.holder_id ?? "",
     });
     setOpen(true);
@@ -129,7 +148,10 @@ export function SparepartsTable({
       sku: form.sku,
       stock_qty: Number(form.stock_qty),
       location_type: form.location_type,
-      holder_id: form.holder_id || null,
+      warehouse_id:
+        form.location_type === "WAREHOUSE" ? form.warehouse_id || null : null,
+      holder_id:
+        form.location_type === "ENGINEER" ? form.holder_id || null : null,
     };
     const result = editing
       ? await updateSparepart(editing.id, payload)
@@ -154,6 +176,16 @@ export function SparepartsTable({
     }
     toast.success("Sparepart dihapus");
     router.refresh();
+  }
+
+  function locationLabel(s: SparepartRow) {
+    if (s.location_type === "ENGINEER") {
+      return s.holder?.full_name ? `Engineer · ${s.holder.full_name}` : "Engineer";
+    }
+    if (s.warehouse) {
+      return `${s.warehouse.code}${s.warehouse.city ? ` · ${s.warehouse.city}` : ""}`;
+    }
+    return "Warehouse";
   }
 
   return (
@@ -185,7 +217,6 @@ export function SparepartsTable({
                 <TableHead>SKU</TableHead>
                 <TableHead>Stok</TableHead>
                 <TableHead>Lokasi</TableHead>
-                <TableHead>Holder</TableHead>
                 <TableHead className="w-28" />
               </TableRow>
             </TableHeader>
@@ -195,14 +226,15 @@ export function SparepartsTable({
                   <TableCell className="font-medium">{s.name}</TableCell>
                   <TableCell className="font-mono text-xs">{s.sku}</TableCell>
                   <TableCell>
-                    <Badge variant={s.stock_qty <= 2 ? "destructive" : "secondary"}>
+                    <Badge
+                      variant={s.stock_qty <= 2 ? "destructive" : "secondary"}
+                    >
                       {s.stock_qty}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline">{s.location_type}</Badge>
+                    <Badge variant="outline">{locationLabel(s)}</Badge>
                   </TableCell>
-                  <TableCell>{s.holder?.full_name ?? "—"}</TableCell>
                   <TableCell>
                     <div className="flex gap-1">
                       <Button
@@ -213,7 +245,11 @@ export function SparepartsTable({
                       >
                         <History className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(s)}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openEdit(s)}
+                      >
                         <Pencil className="h-4 w-4" />
                       </Button>
                       <Button
@@ -235,14 +271,18 @@ export function SparepartsTable({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editing ? "Edit Sparepart" : "Tambah Sparepart"}</DialogTitle>
+            <DialogTitle>
+              {editing ? "Edit Sparepart" : "Tambah Sparepart"}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">
               <Label>Nama</Label>
               <Input
                 value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, name: e.target.value }))
+                }
                 placeholder="EDC BCA Ingenico"
               />
             </div>
@@ -250,7 +290,9 @@ export function SparepartsTable({
               <Label>SKU</Label>
               <Input
                 value={form.sku}
-                onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, sku: e.target.value }))
+                }
                 placeholder="EDC-BCA-01"
               />
             </div>
@@ -260,15 +302,23 @@ export function SparepartsTable({
                 type="number"
                 min={0}
                 value={form.stock_qty}
-                onChange={(e) => setForm((f) => ({ ...f, stock_qty: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, stock_qty: e.target.value }))
+                }
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Lokasi</Label>
+              <Label>Tipe lokasi</Label>
               <Select
                 value={form.location_type}
                 onValueChange={(v) =>
-                  setForm((f) => ({ ...f, location_type: v as LocationType }))
+                  setForm((f) => ({
+                    ...f,
+                    location_type: v as LocationType,
+                    warehouse_id:
+                      v === "WAREHOUSE" ? f.warehouse_id || defaultWh : "",
+                    holder_id: v === "ENGINEER" ? f.holder_id : "",
+                  }))
                 }
               >
                 <SelectTrigger>
@@ -280,20 +330,55 @@ export function SparepartsTable({
                 </SelectContent>
               </Select>
             </div>
+            {form.location_type === "WAREHOUSE" && (
+              <div className="space-y-1.5">
+                <Label>Gudang</Label>
+                {warehouses.length === 0 ? (
+                  <p className="text-xs text-amber-700">
+                    Belum ada gudang.{" "}
+                    <Link
+                      href="/admin/warehouses"
+                      className="underline font-medium"
+                    >
+                      Buat gudang dulu
+                    </Link>
+                    .
+                  </p>
+                ) : (
+                  <Select
+                    value={form.warehouse_id || undefined}
+                    onValueChange={(v) =>
+                      setForm((f) => ({ ...f, warehouse_id: v }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih gudang" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {warehouses.map((w) => (
+                        <SelectItem key={w.id} value={w.id}>
+                          {w.code} — {w.name}
+                          {w.city ? ` (${w.city})` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+            )}
             {form.location_type === "ENGINEER" && (
               <div className="space-y-1.5">
                 <Label>Holder engineer</Label>
                 <Select
-                  value={form.holder_id || "none"}
+                  value={form.holder_id || undefined}
                   onValueChange={(v) =>
-                    setForm((f) => ({ ...f, holder_id: v === "none" ? "" : v }))
+                    setForm((f) => ({ ...f, holder_id: v }))
                   }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Pilih engineer" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">—</SelectItem>
                     {engineers.map((e) => (
                       <SelectItem key={e.id} value={e.id}>
                         {e.full_name}
@@ -330,7 +415,10 @@ export function SparepartsTable({
           ) : (
             <div className="max-h-80 space-y-2 overflow-y-auto">
               {mutations.map((m) => (
-                <div key={m.id} className="rounded-md border px-2.5 py-2 text-xs">
+                <div
+                  key={m.id}
+                  className="rounded-md border px-2.5 py-2 text-xs"
+                >
                   <div className="flex items-center justify-between gap-2">
                     <Badge
                       variant={

@@ -53,6 +53,7 @@ export function SparepartsExcelTools() {
               name: r.name,
               stock_qty: r.stock_qty,
               location_type: r.location_type,
+              warehouse_code: r.warehouse_code,
               holder_phone: r.holder_phone,
             }))
           : [SPAREPART_SAMPLE_ROW],
@@ -189,6 +190,7 @@ export function SparepartsExcelTools() {
                   <TableHead className="w-12">#</TableHead>
                   <TableHead>SKU</TableHead>
                   <TableHead>Nama</TableHead>
+                  <TableHead>Gudang</TableHead>
                   <TableHead>Stok</TableHead>
                   <TableHead>Aksi</TableHead>
                   <TableHead>Error</TableHead>
@@ -202,6 +204,11 @@ export function SparepartsExcelTools() {
                     </TableCell>
                     <TableCell className="font-mono text-xs">{r.sku}</TableCell>
                     <TableCell className="text-sm">{r.name}</TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {r.location_type === "WAREHOUSE"
+                        ? r.warehouse_code || "—"
+                        : r.holder_phone || "ENG"}
+                    </TableCell>
                     <TableCell>{r.stock_qty}</TableCell>
                     <TableCell>
                       <Badge

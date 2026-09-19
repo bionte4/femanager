@@ -20,9 +20,48 @@ export type ActionResult<T = undefined> =
   | { success: true; data?: T }
   | { success: false; error: string };
 
+function resolveLocationIds(data: SparepartInput) {
+  const warehouse_id =
+    data.location_type === "WAREHOUSE" ? data.warehouse_id || null : null;
+  const holder_id =
+    data.location_type === "ENGINEER" ? data.holder_id || null : null;
+  return { warehouse_id, holder_id };
+}
+
+async function findSkuConflict(opts: {
+  sku: string;
+  location_type: LocationType;
+  warehouse_id: string | null;
+  holder_id: string | null;
+  excludeId?: string;
+}) {
+  if (opts.location_type === "WAREHOUSE" && opts.warehouse_id) {
+    return prisma.sparepart.findFirst({
+      where: {
+        sku: opts.sku,
+        location_type: "WAREHOUSE",
+        warehouse_id: opts.warehouse_id,
+        ...(opts.excludeId ? { NOT: { id: opts.excludeId } } : {}),
+      },
+    });
+  }
+  if (opts.location_type === "ENGINEER" && opts.holder_id) {
+    return prisma.sparepart.findFirst({
+      where: {
+        sku: opts.sku,
+        location_type: "ENGINEER",
+        holder_id: opts.holder_id,
+        ...(opts.excludeId ? { NOT: { id: opts.excludeId } } : {}),
+      },
+    });
+  }
+  return null;
+}
+
 export async function getSpareparts(params: {
   q?: string;
   location_type?: string;
+  warehouse_id?: string;
   page?: number;
   pageSize?: number;
 }) {
@@ -31,6 +70,7 @@ export async function getSpareparts(params: {
   const pageSize = Math.min(50, Math.max(5, params.pageSize ?? 15));
   const q = params.q?.trim();
   const locationType = params.location_type?.trim();
+  const warehouseId = params.warehouse_id?.trim();
 
   const where: Prisma.SparepartWhereInput = {
     AND: [
@@ -42,9 +82,11 @@ export async function getSpareparts(params: {
             ],
           }
         : {},
-      locationType && (locationType === "WAREHOUSE" || locationType === "ENGINEER")
+      locationType &&
+      (locationType === "WAREHOUSE" || locationType === "ENGINEER")
         ? { location_type: locationType as LocationType }
         : {},
+      warehouseId ? { warehouse_id: warehouseId } : {},
     ],
   };
 
@@ -57,6 +99,9 @@ export async function getSpareparts(params: {
       take: pageSize,
       include: {
         holder: { select: { id: true, full_name: true, phone: true } },
+        warehouse: {
+          select: { id: true, code: true, name: true, city: true },
+        },
       },
     }),
   ]);
@@ -83,6 +128,7 @@ export async function listAvailableSpareparts() {
       sku: true,
       stock_qty: true,
       location_type: true,
+      warehouse: { select: { code: true, name: true } },
     },
     take: 100,
   });
@@ -94,9 +140,30 @@ export async function createSparepart(
   try {
     const session = await requireAdmin();
     const data = sparepartSchema.parse(input);
+    const { warehouse_id, holder_id } = resolveLocationIds(data);
 
-    const existing = await prisma.sparepart.findUnique({ where: { sku: data.sku } });
-    if (existing) return { success: false, error: "SKU sudah dipakai" };
+    if (data.location_type === "WAREHOUSE" && warehouse_id) {
+      const wh = await prisma.warehouse.findFirst({
+        where: { id: warehouse_id, is_active: true },
+      });
+      if (!wh) return { success: false, error: "Gudang tidak ditemukan / nonaktif" };
+    }
+
+    const conflict = await findSkuConflict({
+      sku: data.sku,
+      location_type: data.location_type,
+      warehouse_id,
+      holder_id,
+    });
+    if (conflict) {
+      return {
+        success: false,
+        error:
+          data.location_type === "WAREHOUSE"
+            ? "SKU sudah ada di gudang ini"
+            : "SKU sudah ada pada engineer ini",
+      };
+    }
 
     const created = await prisma.sparepart.create({
       data: {
@@ -104,8 +171,8 @@ export async function createSparepart(
         sku: data.sku,
         stock_qty: data.stock_qty,
         location_type: data.location_type,
-        holder_id:
-          data.location_type === "ENGINEER" ? data.holder_id || null : null,
+        warehouse_id,
+        holder_id,
       },
     });
 
@@ -137,14 +204,34 @@ export async function updateSparepart(
   try {
     const session = await requireAdmin();
     const data = sparepartSchema.parse(input);
+    const { warehouse_id, holder_id } = resolveLocationIds(data);
 
-    const conflict = await prisma.sparepart.findFirst({
-      where: { sku: data.sku, NOT: { id } },
-    });
-    if (conflict) return { success: false, error: "SKU sudah dipakai" };
+    if (data.location_type === "WAREHOUSE" && warehouse_id) {
+      const wh = await prisma.warehouse.findFirst({
+        where: { id: warehouse_id, is_active: true },
+      });
+      if (!wh) return { success: false, error: "Gudang tidak ditemukan / nonaktif" };
+    }
 
     const existing = await prisma.sparepart.findUnique({ where: { id } });
     if (!existing) return { success: false, error: "Sparepart tidak ditemukan" };
+
+    const conflict = await findSkuConflict({
+      sku: data.sku,
+      location_type: data.location_type,
+      warehouse_id,
+      holder_id,
+      excludeId: id,
+    });
+    if (conflict) {
+      return {
+        success: false,
+        error:
+          data.location_type === "WAREHOUSE"
+            ? "SKU sudah ada di gudang ini"
+            : "SKU sudah ada pada engineer ini",
+      };
+    }
 
     await prisma.$transaction(async (tx) => {
       await tx.sparepart.update({
@@ -154,8 +241,8 @@ export async function updateSparepart(
           sku: data.sku,
           stock_qty: data.stock_qty,
           location_type: data.location_type,
-          holder_id:
-            data.location_type === "ENGINEER" ? data.holder_id || null : null,
+          warehouse_id,
+          holder_id,
         },
       });
 
@@ -261,7 +348,10 @@ export async function getSparepartsForExport() {
   await requireAdmin();
   const items = await prisma.sparepart.findMany({
     orderBy: { sku: "asc" },
-    include: { holder: { select: { phone: true, full_name: true } } },
+    include: {
+      holder: { select: { phone: true, full_name: true } },
+      warehouse: { select: { code: true } },
+    },
   });
 
   return items.map((s) => ({
@@ -269,6 +359,7 @@ export async function getSparepartsForExport() {
     name: s.name,
     stock_qty: s.stock_qty,
     location_type: s.location_type,
+    warehouse_code: s.warehouse?.code ?? "",
     holder_phone: s.holder?.phone ?? "",
     holder_name: s.holder?.full_name ?? "",
   }));
@@ -291,18 +382,13 @@ export async function previewSparepartsImport(
       return { success: false, error: "Maksimal 500 baris per import" };
     }
 
-    const skus = rawRows
-      .map((r) => {
-        const n = normalizeExcelHeaders(r);
-        return String(n.sku ?? "").trim();
-      })
-      .filter(Boolean);
-
-    const existing = await prisma.sparepart.findMany({
-      where: { sku: { in: skus } },
-      select: { id: true, sku: true },
+    const warehouses = await prisma.warehouse.findMany({
+      where: { is_active: true },
+      select: { id: true, code: true },
     });
-    const bySku = new Map(existing.map((e) => [e.sku.toLowerCase(), e]));
+    const codeToWh = new Map(
+      warehouses.map((w) => [w.code.toUpperCase(), w])
+    );
 
     const phones = rawRows
       .map((r) => {
@@ -318,8 +404,20 @@ export async function previewSparepartsImport(
         })
       : [];
     const phoneSet = new Set(engineers.map((e) => e.phone));
+    const phoneToId = new Map(engineers.map((e) => [e.phone, e.id]));
 
-    const seenSku = new Set<string>();
+    // Ambil existing untuk match sku+lokasi
+    const existingAll = await prisma.sparepart.findMany({
+      select: {
+        id: true,
+        sku: true,
+        location_type: true,
+        warehouse_id: true,
+        holder_id: true,
+      },
+    });
+
+    const seenKey = new Set<string>();
     const rows: SparepartPreviewRow[] = [];
 
     rawRows.forEach((raw, idx) => {
@@ -329,6 +427,7 @@ export async function previewSparepartsImport(
         name: n.name,
         stock_qty: n.stock_qty,
         location_type: n.location_type,
+        warehouse_code: n.warehouse_code ? String(n.warehouse_code) : null,
         holder_phone: n.holder_phone ? String(n.holder_phone) : null,
       });
 
@@ -340,12 +439,19 @@ export async function previewSparepartsImport(
       }
 
       const data = parsed.success ? parsed.data : null;
-      const skuKey = (data?.sku ?? String(n.sku ?? "")).toLowerCase();
+      let warehouseId: string | null = null;
+      let holderId: string | null = null;
 
-      if (skuKey && seenSku.has(skuKey)) {
-        errors.push("SKU duplikat di file");
+      if (data?.location_type === "WAREHOUSE") {
+        const code = (data.warehouse_code ?? "").trim().toUpperCase();
+        if (!code) {
+          errors.push("warehouse_code wajib jika location_type=WAREHOUSE");
+        } else {
+          const wh = codeToWh.get(code);
+          if (!wh) errors.push(`Kode gudang tidak ditemukan: ${code}`);
+          else warehouseId = wh.id;
+        }
       }
-      if (skuKey) seenSku.add(skuKey);
 
       if (data?.location_type === "ENGINEER") {
         const phone = data.holder_phone?.trim();
@@ -353,10 +459,32 @@ export async function previewSparepartsImport(
           errors.push("holder_phone wajib jika location_type=ENGINEER");
         } else if (!phoneSet.has(phone)) {
           errors.push(`Engineer phone tidak ditemukan: ${phone}`);
+        } else {
+          holderId = phoneToId.get(phone) ?? null;
         }
       }
 
-      const exist = skuKey ? bySku.get(skuKey) : undefined;
+      const locKey =
+        data?.location_type === "WAREHOUSE"
+          ? `W:${warehouseId ?? "?"}`
+          : `E:${holderId ?? data?.holder_phone ?? "?"}`;
+      const dupKey = `${(data?.sku ?? "").toLowerCase()}|${locKey}`;
+      if (data?.sku && seenKey.has(dupKey)) {
+        errors.push("SKU+lokasi duplikat di file");
+      }
+      if (data?.sku) seenKey.add(dupKey);
+
+      const exist = data
+        ? existingAll.find((e) => {
+            if (e.sku.toLowerCase() !== data.sku.toLowerCase()) return false;
+            if (e.location_type !== data.location_type) return false;
+            if (data.location_type === "WAREHOUSE") {
+              return e.warehouse_id === warehouseId;
+            }
+            return e.holder_id === holderId;
+          })
+        : undefined;
+
       const action: SparepartPreviewRow["action"] =
         errors.length > 0 ? "error" : exist ? "update" : "create";
 
@@ -366,6 +494,7 @@ export async function previewSparepartsImport(
         name: data?.name ?? String(n.name ?? ""),
         stock_qty: data?.stock_qty ?? (Number(n.stock_qty) || 0),
         location_type: (data?.location_type as LocationType) ?? "WAREHOUSE",
+        warehouse_code: data?.warehouse_code?.trim().toUpperCase() || null,
         holder_phone: data?.holder_phone?.trim() || null,
         action,
         existing_id: exist?.id,
@@ -404,6 +533,7 @@ export async function commitSparepartsImport(
         name: r.name,
         stock_qty: r.stock_qty,
         location_type: r.location_type,
+        warehouse_code: r.warehouse_code,
         holder_phone: r.holder_phone,
       }))
     );
@@ -419,6 +549,14 @@ export async function commitSparepartsImport(
         error: `${recheck.data.errorCount} baris error — perbaiki dulu`,
       };
     }
+
+    const warehouses = await prisma.warehouse.findMany({
+      where: { is_active: true },
+      select: { id: true, code: true },
+    });
+    const codeToId = new Map(
+      warehouses.map((w) => [w.code.toUpperCase(), w.id])
+    );
 
     const phones = recheck.data.rows
       .map((r) => r.holder_phone)
@@ -436,6 +574,10 @@ export async function commitSparepartsImport(
 
     await prisma.$transaction(async (tx) => {
       for (const row of recheck.data!.rows) {
+        const warehouse_id =
+          row.location_type === "WAREHOUSE" && row.warehouse_code
+            ? codeToId.get(row.warehouse_code.toUpperCase()) ?? null
+            : null;
         const holder_id =
           row.location_type === "ENGINEER" && row.holder_phone
             ? phoneToId.get(row.holder_phone) ?? null
@@ -448,6 +590,7 @@ export async function commitSparepartsImport(
               name: row.name,
               stock_qty: row.stock_qty,
               location_type: row.location_type,
+              warehouse_id,
               holder_id,
             },
           });
@@ -459,6 +602,7 @@ export async function commitSparepartsImport(
               name: row.name,
               stock_qty: row.stock_qty,
               location_type: row.location_type,
+              warehouse_id,
               holder_id,
             },
           });

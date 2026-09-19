@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { auth, ADMIN_ROLES } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Role } from "@prisma/client";
@@ -21,12 +22,15 @@ export default async function AdminSparepartsPage({
   searchParams: SearchParams;
 }) {
   const session = await auth();
-  if (!session?.user || !(ADMIN_ROLES as readonly string[]).includes(session.user.role)) {
+  if (
+    !session?.user ||
+    !(ADMIN_ROLES as readonly string[]).includes(session.user.role)
+  ) {
     redirect("/login");
   }
 
   const page = Number(searchParams.page ?? "1") || 1;
-  const [data, engineers] = await Promise.all([
+  const [data, engineers, warehouses] = await Promise.all([
     getSpareparts({
       q: searchParams.q,
       location_type: searchParams.status,
@@ -37,6 +41,11 @@ export default async function AdminSparepartsPage({
       select: { id: true, full_name: true },
       orderBy: { full_name: "asc" },
     }),
+    prisma.warehouse.findMany({
+      where: { is_active: true },
+      select: { id: true, code: true, name: true, city: true },
+      orderBy: { name: "asc" },
+    }),
   ]);
 
   return (
@@ -45,8 +54,11 @@ export default async function AdminSparepartsPage({
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Spareparts</h1>
           <p className="text-xs text-muted-foreground">
-            Inventory EDC, router, spare di gudang & di engineer. Bulk via Excel
-            dengan preview.
+            Inventory multi-gudang & di engineer. Kelola gudang di{" "}
+            <Link href="/admin/warehouses" className="text-sky-700 underline">
+              Gudang
+            </Link>
+            . Bulk via Excel dengan preview.
           </p>
         </div>
         <SparepartsExcelTools />
@@ -61,7 +73,11 @@ export default async function AdminSparepartsPage({
             { value: "ENGINEER", label: "Engineer" },
           ]}
         />
-        <SparepartsTable items={data.items} engineers={engineers} />
+        <SparepartsTable
+          items={data.items}
+          engineers={engineers}
+          warehouses={warehouses}
+        />
         {data.totalPages > 1 && (
           <p className="text-sm text-muted-foreground">
             Halaman {data.page} / {data.totalPages} · {data.total} item

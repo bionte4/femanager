@@ -12,6 +12,7 @@ export const sparepartExcelRowSchema = z.object({
     .string()
     .transform((v) => v.trim().toUpperCase())
     .pipe(z.enum(["WAREHOUSE", "ENGINEER"])),
+  warehouse_code: z.string().optional().nullable(),
   holder_phone: z.string().optional().nullable(),
 });
 
@@ -23,6 +24,7 @@ export type SparepartPreviewRow = {
   name: string;
   stock_qty: number;
   location_type: LocationType;
+  warehouse_code: string | null;
   holder_phone: string | null;
   action: "create" | "update" | "error";
   existing_id?: string;
@@ -34,6 +36,7 @@ export const SPAREPART_EXCEL_HEADERS = [
   "name",
   "stock_qty",
   "location_type",
+  "warehouse_code",
   "holder_phone",
 ] as const;
 
@@ -42,5 +45,6 @@ export const SPAREPART_SAMPLE_ROW = {
   name: "EDC BCA Contoh",
   stock_qty: 5,
   location_type: "WAREHOUSE",
+  warehouse_code: "HQ",
   holder_phone: "",
 };

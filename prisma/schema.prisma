@@ -403,17 +403,39 @@ model TicketLog {
 model Sparepart {
   id            String       @id @default(cuid())
   name          String
-  sku           String       @unique
+  /// Unik per gudang (WAREHOUSE) atau per holder (ENGINEER) — lihat partial unique index
+  sku           String
   stock_qty     Int          @default(0)
   location_type LocationType @default(WAREHOUSE)
+  warehouse_id  String?
   holder_id     String?
   created_at    DateTime     @default(now())
   updated_at    DateTime     @updatedAt
 
+  warehouse  Warehouse?          @relation(fields: [warehouse_id], references: [id])
   holder     User?               @relation("SparepartHolder", fields: [holder_id], references: [id])
   mutations  SparepartMutation[]
 
+  @@index([warehouse_id])
+  @@index([sku])
   @@map("spareparts")
+}
+
+/// Master gudang fisik (multi-lokasi)
+model Warehouse {
+  id         String   @id @default(cuid())
+  code       String   @unique
+  name       String
+  city       String?
+  address    String?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  spareparts Sparepart[]
+
+  @@index([city])
+  @@map("warehouses")
 }
 
 enum SparepartMutationType {
