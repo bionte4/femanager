@@ -929,3 +929,66 @@ export async function assignEngineerAction(
     };
   }
 }
+
+/**
+ * Force auto-dispatch / re-dispatch — untuk Dispatcher & NOC.
+ * Skip FE yang sudah dicoba (saat ASSIGNED menunggu accept).
+ */
+export async function forceRedispatchAction(
+  ticketId: string
+): Promise<ActionResult<{ engineer_name?: string; attempt?: number }>> {
+  try {
+    await requireAdmin();
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: ticketId },
+      select: {
+        id: true,
+        status: true,
+        accepted_at: true,
+        ticket_no: true,
+      },
+    });
+    if (!ticket) return { success: false, error: "Ticket tidak ditemukan" };
+    if (ticket.accepted_at) {
+      return { success: false, error: "Ticket sudah di-accept — tidak bisa re-dispatch" };
+    }
+    if (
+      ticket.status === TicketStatus.RESOLVED ||
+      ticket.status === TicketStatus.CLOSED ||
+      ticket.status === TicketStatus.PENDING_L1
+    ) {
+      return {
+        success: false,
+        error: `Status ${ticket.status} — gunakan assign manual / alur L1`,
+      };
+    }
+
+    const { autoDispatchTicket } = await import("@/lib/dispatch");
+    const result = await autoDispatchTicket(ticketId, { force: true });
+
+    revalidatePath("/admin/tickets");
+    revalidatePath(`/admin/tickets/${ticketId}`);
+    revalidatePath("/admin/routing");
+    revalidatePath("/admin/dashboard");
+
+    if (!result.success) {
+      return {
+        success: false,
+        error: result.error ?? "Force re-dispatch gagal (tidak ada FE cocok)",
+      };
+    }
+
+    return {
+      success: true,
+      data: {
+        engineer_name: result.engineer?.full_name,
+        attempt: result.attempt,
+      },
+    };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Gagal force re-dispatch",
+    };
+  }
+}

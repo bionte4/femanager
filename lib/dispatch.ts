@@ -238,7 +238,7 @@ export type DispatchResult = {
  */
 export async function autoDispatchTicket(
   ticketId: string,
-  options?: { isReassign?: boolean; pkwtOnly?: boolean }
+  options?: { isReassign?: boolean; pkwtOnly?: boolean; force?: boolean }
 ): Promise<DispatchResult> {
   const ticket = await prisma.ticket.findUnique({
     where: { id: ticketId },
@@ -263,17 +263,33 @@ export async function autoDispatchTicket(
     };
   }
 
+  const forceableStatuses: TicketStatus[] = [
+    TicketStatus.OPEN,
+    TicketStatus.ASSIGNED,
+    TicketStatus.ESCALATED,
+    TicketStatus.PENDING_SPAREPART,
+  ];
+
   const isFirst = !options?.isReassign && ticket.status === TicketStatus.OPEN;
   const isReassign =
     !!options?.isReassign && ticket.status === TicketStatus.ASSIGNED;
+  /** Force dari Dispatcher/NOC: OPEN / ASSIGNED menunggu accept / ESCALATED / PENDING_SPAREPART */
+  const isForce =
+    !!options?.force &&
+    !ticket.accepted_at &&
+    forceableStatuses.includes(ticket.status);
 
-  if (!isFirst && !isReassign) {
+  if (!isFirst && !isReassign && !isForce) {
     return {
       success: false,
       ticket_id: ticketId,
       error: `Status ${ticket.status} tidak bisa di-dispatch`,
     };
   }
+
+  // Force pada ASSIGNED = re-assign (skip FE yang sudah dicoba/saat ini)
+  const treatAsReassign =
+    isReassign || (isForce && ticket.status === TicketStatus.ASSIGNED);
 
   const category =
     ticket.service_category ??
@@ -311,7 +327,7 @@ export async function autoDispatchTicket(
     categoryCode,
     requiresCertification: requiresCert,
     preferToolkit,
-    excludeIds: isReassign ? excludeForReassign : triedEngineerIds,
+    excludeIds: treatAsReassign ? excludeForReassign : triedEngineerIds,
     limit: Math.max(5, requiredEngineers + 2),
     pkwtOnly: options?.pkwtOnly,
   });
@@ -400,15 +416,15 @@ export async function autoDispatchTicket(
         ticket_id: ticket.id,
         status_from: ticket.status,
         status_to: TicketStatus.ASSIGNED,
-        notes: isReassign
-          ? `Auto re-assign #${attempt} ke ${engineer.full_name} (${Math.round(engineer.distance_meters)}m)${engineer.engagement_type && isPkwtEngagement(engineer.engagement_type) ? " · PKWT" : ""}`
-          : `Auto-dispatch ke ${engineer.full_name} (${Math.round(engineer.distance_meters)}m)${categoryCode ? ` · ${categoryCode}` : ""}${requiresCert ? " · cert OK" : ""}${requiredEngineers > 1 ? ` · butuh ${requiredEngineers} FE` : ""}${engineer.engagement_type && isPkwtEngagement(engineer.engagement_type) ? " · PKWT" : ""}`,
+        notes: treatAsReassign
+          ? `${options?.force ? "Force " : ""}Auto re-assign #${attempt} ke ${engineer.full_name} (${Math.round(engineer.distance_meters)}m)${engineer.engagement_type && isPkwtEngagement(engineer.engagement_type) ? " · PKWT" : ""}`
+          : `${options?.force ? "Force " : ""}Auto-dispatch ke ${engineer.full_name} (${Math.round(engineer.distance_meters)}m)${categoryCode ? ` · ${categoryCode}` : ""}${requiresCert ? " · cert OK" : ""}${requiredEngineers > 1 ? ` · butuh ${requiredEngineers} FE` : ""}${engineer.engagement_type && isPkwtEngagement(engineer.engagement_type) ? " · PKWT" : ""}`,
         photo_url: [],
       },
     });
   });
 
-  const message = isReassign
+  const message = treatAsReassign
     ? buildReassignMessage(ticket.ticket_no, ticket.tenant.name, attempt)
     : buildDispatchMessage(ticket.ticket_no, ticket.tenant.name);
 

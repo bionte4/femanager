@@ -33,10 +33,10 @@ function canL1(role: string) {
   return (NOC_L1_ROLES as readonly string[]).includes(role);
 }
 
-/** Antrian L0: ticket aktif yang belum di-escalate ke L1 */
+/** Antrian L0: ticket aktif yang belum di-escalate ke L1 — SLA due dulu */
 export async function getL0RoutingQueue() {
   await requireAdmin();
-  return prisma.ticket.findMany({
+  const rows = await prisma.ticket.findMany({
     where: {
       status: {
         in: [
@@ -48,34 +48,71 @@ export async function getL0RoutingQueue() {
       escalated_to_l1_at: null,
     },
     include: ticketListInclude,
-    orderBy: [{ priority: "desc" }, { created_at: "asc" }],
     take: 100,
   });
+  return sortBySlaThenPriority(rows);
 }
 
 /** Antrian L1: menunggu pengecekan device & assign FE */
 export async function getL1RoutingQueue() {
   await requireAdmin();
-  return prisma.ticket.findMany({
+  const rows = await prisma.ticket.findMany({
     where: { status: TicketStatus.PENDING_L1 },
     include: ticketListInclude,
-    orderBy: [{ escalated_to_l1_at: "asc" }, { created_at: "asc" }],
     take: 100,
   });
+  return sortBySlaThenPriority(rows);
 }
 
 /** Antrian menunggu FE accept (countdown 15 menit sebelum re-assign) */
 export async function getWaitingAcceptQueue() {
   await requireAdmin();
-  return prisma.ticket.findMany({
+  const rows = await prisma.ticket.findMany({
     where: {
       status: TicketStatus.ASSIGNED,
       accepted_at: null,
       last_assigned_at: { not: null },
     },
     include: ticketListInclude,
-    orderBy: [{ last_assigned_at: "asc" }],
     take: 100,
+  });
+  return sortBySlaThenPriority(rows);
+}
+
+/** Exception: SLA overdue / hampir overdue (<2 jam) + belum resolved */
+export async function getOverdueRoutingQueue() {
+  await requireAdmin();
+  const now = new Date();
+  const soon = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+  const rows = await prisma.ticket.findMany({
+    where: {
+      status: {
+        notIn: [TicketStatus.RESOLVED, TicketStatus.CLOSED],
+      },
+      sla_due_at: { not: null, lte: soon },
+    },
+    include: ticketListInclude,
+    take: 100,
+  });
+  return sortBySlaThenPriority(rows);
+}
+
+function sortBySlaThenPriority<
+  T extends {
+    sla_due_at: Date | null;
+    priority: string;
+    created_at: Date;
+  },
+>(rows: T[]): T[] {
+  const pri = (p: string) =>
+    p === "CRITICAL" ? 0 : p === "HIGH" ? 1 : p === "MEDIUM" ? 2 : 3;
+  return [...rows].sort((a, b) => {
+    const aDue = a.sla_due_at?.getTime() ?? Number.POSITIVE_INFINITY;
+    const bDue = b.sla_due_at?.getTime() ?? Number.POSITIVE_INFINITY;
+    if (aDue !== bDue) return aDue - bDue;
+    const pd = pri(a.priority) - pri(b.priority);
+    if (pd !== 0) return pd;
+    return a.created_at.getTime() - b.created_at.getTime();
   });
 }
 
@@ -213,7 +250,9 @@ export async function claimL1TicketAction(input: {
 
 export async function getRoutingCounts() {
   await requireAdmin();
-  const [l0, l1, accept] = await Promise.all([
+  const now = new Date();
+  const soon = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+  const [l0, l1, accept, overdue] = await Promise.all([
     prisma.ticket.count({
       where: {
         status: {
@@ -234,6 +273,14 @@ export async function getRoutingCounts() {
         last_assigned_at: { not: null },
       },
     }),
+    prisma.ticket.count({
+      where: {
+        status: {
+          notIn: [TicketStatus.RESOLVED, TicketStatus.CLOSED],
+        },
+        sla_due_at: { not: null, lte: soon },
+      },
+    }),
   ]);
-  return { l0, l1, accept };
+  return { l0, l1, accept, overdue };
 }

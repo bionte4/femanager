@@ -3,10 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { TicketStatus } from "@prisma/client";
-import { Loader2, Pause, Play, ArrowUpRight } from "lucide-react";
+import { Loader2, Pause, Play, ArrowUpRight, RefreshCw } from "lucide-react";
 import {
   assignEngineerAction,
   approveStopClockAction,
+  forceRedispatchAction,
   pauseSlaClockAction,
   rejectStopClockAction,
   resumeSlaClockAction,
@@ -88,6 +89,7 @@ export function TicketActionsPanel({
     | "escalate"
     | "approve"
     | "reject"
+    | "redispatch"
     | null
   >(null);
   const [error, setError] = useState<string | null>(null);
@@ -95,6 +97,38 @@ export function TicketActionsPanel({
 
   const isPaused = !!slaPausedAt;
   const pendingApproval = stopClockApprovalStatus === "PENDING";
+  const canForceRedispatch = [
+    "OPEN",
+    "ASSIGNED",
+    "ESCALATED",
+    "PENDING_SPAREPART",
+  ].includes(currentStatus);
+
+  async function handleForceRedispatch() {
+    if (
+      !confirm(
+        "Jalankan force auto-dispatch? FE yang sudah dicoba akan di-skip."
+      )
+    ) {
+      return;
+    }
+    setLoading("redispatch");
+    setError(null);
+    setOk(null);
+    const result = await forceRedispatchAction(ticketId);
+    setLoading(null);
+    if (!result.success) {
+      setError(result.error);
+      return;
+    }
+    setOk(
+      result.data?.engineer_name
+        ? `Force re-dispatch → ${result.data.engineer_name}`
+        : "Force re-dispatch sukses"
+    );
+    setStatus("ASSIGNED");
+    router.refresh();
+  }
 
   async function handleAssign() {
     if (!engineerId) {
@@ -355,6 +389,27 @@ export function TicketActionsPanel({
                 </Button>
               </div>
             )}
+
+          <div className="space-y-2 border-t pt-4">
+            <Label>Otomasi dispatch</Label>
+            <p className="text-xs text-muted-foreground">
+              Assign otomatis FE terdekat (skip yang sudah dicoba). Untuk
+              exception: timeout accept, ESCALATED, atau OPEN tanpa FE.
+            </p>
+            <Button
+              variant="outline"
+              onClick={() => void handleForceRedispatch()}
+              disabled={loading === "redispatch" || !canForceRedispatch}
+              className="w-full"
+            >
+              {loading === "redispatch" ? (
+                <Loader2 className="animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              Force Re-dispatch
+            </Button>
+          </div>
 
           <div className="space-y-2 border-t pt-4">
             <Label>Assign Engineer (manual)</Label>
