@@ -79,7 +79,7 @@ Margin berasal dari selisih `price_customer` vs `fee_engineer` di `ServicePackag
 
 Untuk tiap ticket resolved ontime:
 - Revenue customer (paket) − fee FE − bonus ontime + penalty breach (jika ada)
-- Cost platform: hosting, WA gateway, Mapbox, support NOC
+- Cost platform: hosting, WA gateway, support NOC (peta MapLibre/OpenFreeMap gratis)
 
 KPI yang dilacak di produk:
 - SLA Meet %

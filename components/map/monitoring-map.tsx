@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import mapboxgl from "mapbox-gl";
-import "mapbox-gl/dist/mapbox-gl.css";
-import { Loader2, MapPin, RefreshCw } from "lucide-react";
+import * as maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
+import { Loader2, RefreshCw } from "lucide-react";
 import { MapKpiCards } from "@/components/map/map-kpi-cards";
 import { createTicketAction } from "@/app/actions/tickets";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { DEFAULT_MAP_CENTER, OPENFREEMAP_STYLE } from "@/lib/map";
 import { cn } from "@/lib/utils";
 
 type TenantMapStatus = "up" | "down" | "alert";
@@ -143,9 +144,9 @@ function engineerPopupHtml(e: MapEngineer): string {
 export function MonitoringMap() {
   const router = useRouter();
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<mapboxgl.Map | null>(null);
-  const engineerMarkersRef = useRef<mapboxgl.Marker[]>([]);
-  const popupRef = useRef<mapboxgl.Popup | null>(null);
+  const mapRef = useRef<maplibregl.Map | null>(null);
+  const engineerMarkersRef = useRef<maplibregl.Marker[]>([]);
+  const popupRef = useRef<maplibregl.Popup | null>(null);
   const creatingRef = useRef(false);
   const createTicketRef = useRef<(tenantId: string) => Promise<void>>(async () => {});
 
@@ -154,8 +155,6 @@ export function MonitoringMap() {
   const [slaTier, setSlaTier] = useState("all");
   const [creating, setCreating] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-
-  const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 
   const query = useQuery({
     queryKey: ["map-monitoring", city, status, slaTier],
@@ -227,20 +226,19 @@ export function MonitoringMap() {
 
   createTicketRef.current = handleCreateTicket;
 
-  // Init map sekali
+  // Init map sekali — MapLibre + OpenFreeMap (tanpa token)
   useEffect(() => {
-    if (!token || !mapContainerRef.current || mapRef.current) return;
+    if (!mapContainerRef.current || mapRef.current) return;
 
-    mapboxgl.accessToken = token;
-    const map = new mapboxgl.Map({
+    const map = new maplibregl.Map({
       container: mapContainerRef.current,
-      style: "mapbox://styles/mapbox/light-v11",
-      center: [106.8456, -6.2088],
+      style: OPENFREEMAP_STYLE.positron,
+      center: DEFAULT_MAP_CENTER,
       zoom: 10,
     });
 
-    map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "bottom-right");
-    map.addControl(new mapboxgl.FullscreenControl(), "bottom-right");
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
+    map.addControl(new maplibregl.FullscreenControl(), "bottom-right");
 
     map.on("load", () => {
       map.addSource("tenants", {
@@ -288,15 +286,15 @@ export function MonitoringMap() {
         },
       });
 
-      map.on("click", "clusters", (e) => {
+      map.on("click", "clusters", (e: maplibregl.MapLayerMouseEvent) => {
         const features = map.queryRenderedFeatures(e.point, {
           layers: ["clusters"],
         });
-        const clusterId = features[0]?.properties?.cluster_id;
-        const source = map.getSource("tenants") as mapboxgl.GeoJSONSource;
+        const clusterId = features[0]?.properties?.cluster_id as number | undefined;
+        const source = map.getSource("tenants") as maplibregl.GeoJSONSource;
         if (clusterId == null) return;
-        source.getClusterExpansionZoom(clusterId, (err, zoom) => {
-          if (err || zoom == null) return;
+
+        void source.getClusterExpansionZoom(clusterId).then((zoom: number) => {
           const geometry = features[0].geometry;
           if (geometry.type !== "Point") return;
           map.easeTo({
@@ -306,7 +304,7 @@ export function MonitoringMap() {
         });
       });
 
-      map.on("click", "unclustered-point", (e) => {
+      map.on("click", "unclustered-point", (e: maplibregl.MapLayerMouseEvent) => {
         const feature = e.features?.[0];
         if (!feature || feature.geometry.type !== "Point") return;
         const id = feature.properties?.id as string;
@@ -316,13 +314,12 @@ export function MonitoringMap() {
 
         const coords = feature.geometry.coordinates.slice() as [number, number];
         popupRef.current?.remove();
-        const popup = new mapboxgl.Popup({ offset: 12, maxWidth: "300px" })
+        const popup = new maplibregl.Popup({ offset: 12, maxWidth: "300px" })
           .setLngLat(coords)
           .setHTML(tenantPopupHtml(tenant))
           .addTo(map);
         popupRef.current = popup;
 
-        // Bind create ticket button
         requestAnimationFrame(() => {
           const btn = document.querySelector(
             `[data-create-ticket="${tenant.id}"]`
@@ -356,8 +353,7 @@ export function MonitoringMap() {
       map.remove();
       mapRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, []);
 
   // Update tenant geojson + store for popup
   useEffect(() => {
@@ -367,7 +363,7 @@ export function MonitoringMap() {
     if (!map) return;
 
     const apply = () => {
-      const source = map.getSource("tenants") as mapboxgl.GeoJSONSource | undefined;
+      const source = map.getSource("tenants") as maplibregl.GeoJSONSource | undefined;
       if (source) source.setData(geojson);
     };
 
@@ -394,10 +390,10 @@ export function MonitoringMap() {
       el.style.cursor = "pointer";
       if (eng.status === "OFFLINE") el.style.opacity = "0.45";
 
-      const marker = new mapboxgl.Marker({ element: el })
+      const marker = new maplibregl.Marker({ element: el })
         .setLngLat([eng.lng, eng.lat])
         .setPopup(
-          new mapboxgl.Popup({ offset: 10 }).setHTML(engineerPopupHtml(eng))
+          new maplibregl.Popup({ offset: 10 }).setHTML(engineerPopupHtml(eng))
         )
         .addTo(map);
 
@@ -407,7 +403,6 @@ export function MonitoringMap() {
 
   return (
     <div className="relative flex h-[calc(100dvh-4rem)] flex-col gap-3 lg:h-[calc(100dvh-2rem)]">
-      {/* KPI */}
       {data?.kpi ? (
         <MapKpiCards kpi={data.kpi} />
       ) : (
@@ -418,7 +413,6 @@ export function MonitoringMap() {
         </div>
       )}
 
-      {/* Filters */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <Select value={city} onValueChange={setCity}>
           <SelectTrigger className="bg-background sm:w-48">
@@ -470,7 +464,6 @@ export function MonitoringMap() {
         </Button>
       </div>
 
-      {/* Legend */}
       <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-full bg-emerald-600" /> Tenant UP
@@ -491,47 +484,8 @@ export function MonitoringMap() {
         </span>
       </div>
 
-      {/* Map */}
       <div className="relative min-h-0 flex-1 overflow-hidden rounded-xl border bg-muted/30">
-        {token ? (
-          <div ref={mapContainerRef} className="h-full w-full" />
-        ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
-            <MapPin className="h-10 w-10 text-muted-foreground" />
-            <div>
-              <p className="font-semibold">Mapbox token belum di-set</p>
-              <p className="mt-1 max-w-md text-sm text-muted-foreground">
-                Isi <code className="rounded bg-muted px-1">NEXT_PUBLIC_MAPBOX_TOKEN</code> di
-                .env lalu restart server. KPI & filter tetap aktif.
-              </p>
-            </div>
-            {data && (
-              <div className="mt-2 max-h-64 w-full max-w-lg overflow-auto rounded-lg border bg-background text-left text-sm">
-                {data.tenants.slice(0, 20).map((t) => (
-                  <div
-                    key={t.id}
-                    className="flex items-center justify-between border-b px-3 py-2 last:border-0"
-                  >
-                    <div>
-                      <p className="font-medium">{t.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {t.city} · {t.map_status.toUpperCase()}
-                      </p>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={creating}
-                      onClick={() => handleCreateTicket(t.id)}
-                    >
-                      Buat Ticket
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+        <div ref={mapContainerRef} className="h-full w-full" />
 
         {(query.isLoading || creating) && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/40 backdrop-blur-[1px]">

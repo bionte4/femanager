@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import mapboxgl from "mapbox-gl";
-import "mapbox-gl/dist/mapbox-gl.css";
+import * as maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
 import type { CandidateStatus } from "@prisma/client";
+import { DEFAULT_MAP_CENTER, OPENFREEMAP_STYLE } from "@/lib/map";
 
 const STATUS_COLOR: Record<string, string> = {
   NEW: "#3b82f6",
@@ -27,25 +28,23 @@ type Point = {
 
 export function CandidateMap({ points }: { points: Point[] }) {
   const ref = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<mapboxgl.Map | null>(null);
-  const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
+  const mapRef = useRef<maplibregl.Map | null>(null);
 
   useEffect(() => {
-    if (!token || !ref.current || mapRef.current) return;
-    mapboxgl.accessToken = token;
+    if (!ref.current || mapRef.current) return;
     const valid = points.filter((p) => p.lat != null && p.lng != null);
     const center: [number, number] =
       valid.length > 0
         ? [valid[0].lng!, valid[0].lat!]
-        : [106.8456, -6.2088];
+        : DEFAULT_MAP_CENTER;
 
-    const map = new mapboxgl.Map({
+    const map = new maplibregl.Map({
       container: ref.current,
-      style: "mapbox://styles/mapbox/light-v11",
+      style: OPENFREEMAP_STYLE.positron,
       center,
       zoom: 5,
     });
-    map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
 
     for (const p of valid) {
       const el = document.createElement("div");
@@ -55,10 +54,10 @@ export function CandidateMap({ points }: { points: Point[] }) {
       el.style.background = STATUS_COLOR[p.status] ?? "#64748b";
       el.style.border = "2px solid white";
       el.style.boxShadow = "0 1px 4px rgba(0,0,0,.3)";
-      new mapboxgl.Marker({ element: el })
+      new maplibregl.Marker({ element: el })
         .setLngLat([p.lng!, p.lat!])
         .setPopup(
-          new mapboxgl.Popup({ offset: 12 }).setHTML(
+          new maplibregl.Popup({ offset: 12 }).setHTML(
             `<strong>${p.full_name}</strong><br/>${p.city}<br/><span style="color:${STATUS_COLOR[p.status]}">${p.status}</span><br/>${p.skills.join(", ")}`
           )
         )
@@ -66,7 +65,7 @@ export function CandidateMap({ points }: { points: Point[] }) {
     }
 
     if (valid.length > 1) {
-      const bounds = new mapboxgl.LngLatBounds();
+      const bounds = new maplibregl.LngLatBounds();
       valid.forEach((p) => bounds.extend([p.lng!, p.lat!]));
       map.fitBounds(bounds, { padding: 40, maxZoom: 12 });
     }
@@ -77,15 +76,7 @@ export function CandidateMap({ points }: { points: Point[] }) {
       mapRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
-
-  if (!token) {
-    return (
-      <div className="flex h-[320px] items-center justify-center rounded-xl border bg-muted/40 text-sm text-muted-foreground">
-        Mapbox token belum di-set — peta kandidat tidak tersedia
-      </div>
-    );
-  }
+  }, []);
 
   return <div ref={ref} className="h-[320px] w-full overflow-hidden rounded-xl border" />;
 }

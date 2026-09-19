@@ -8,7 +8,7 @@ Buat project baru sesuai.cursorrules postgres native.
 3. Buat prisma/schema.prisma lengkap dengan semua model: User, Tenant, Device, SlaConfig, Ticket, TicketLog, Sparepart, dan semua Enum. Tambahkan field lat/lng Float untuk geo.
 4. Buat file prisma/migrations/enable_postgis/migration.sql isinya CREATE EXTENSION postgis dan pg_trgm
 5. Buat lib/prisma.ts singleton
-6. Install semua dependency: prisma, @prisma/client, next-auth, bcryptjs, sharp, localforage, mapbox-gl
+6. Install semua dependency: prisma, @prisma/client, next-auth, bcryptjs, sharp, localforage, maplibre-gl
 7. Buat prisma/seed.ts untuk seed 3 SLA tier, 5 User dummy (1 admin, 4 engineer dengan lat/lng berbeda di Jabodetabek), 20 Tenant dummy se-Jabodetabek dengan lat/lng real
 8. Jangan lanjut sampai docker-compose up dan npx prisma migrate dev & seed berhasil.
 

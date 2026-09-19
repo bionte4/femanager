@@ -34,7 +34,7 @@ Panduan penggunaan untuk peran operasional: Super Admin, NOC L0, NOC L1, Dispatc
 - **War Room** (`/admin/war-room`) — papan live: device DOWN, overdue, antrian L1, FE available. Tekan **F** untuk fullscreen; refresh otomatis ~12 detik.
 
 ### 3.2 Peta
-Sebaran toko & engineer (Mapbox). Status device hijau/merah.
+Sebaran toko & engineer (MapLibre). Status device hijau/merah.
 
 ### 3.3 Routing (L0 → L1)
 1. **L0 Inbox** — ticket OPEN / ESCALATED / pending sparepart yang belum ke L1.

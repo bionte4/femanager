@@ -14,7 +14,7 @@ Next.js 14 App Router  ── NextAuth (JWT)
         │
         ├── Prisma → PostgreSQL (+ PostGIS)
         ├── Storage foto (local / MinIO)
-        ├── Mapbox GL
+        ├── MapLibre GL + OpenFreeMap
         ├── WhatsApp gateway (Fonnte/dll, opsional)
         └── Cron + Webhook outbound / DLQ
 ```
@@ -26,7 +26,7 @@ Next.js 14 App Router  ── NextAuth (JWT)
 - Node.js **20+**
 - Docker Desktop (Postgres PostGIS, pgAdmin, MinIO)
 - npm
-- (Opsional) Mapbox token, Fonnte/WA token, FCM
+- (Opsional) Fonnte/WA token, FCM
 
 ---
 
@@ -72,7 +72,6 @@ Lihat `.env.example`. Yang penting:
 | `NEXTAUTH_URL` | Base URL app |
 | `CRON_SECRET` | Bearer cron (wajib; tanpa secret → 401) |
 | `MONITORING_WEBHOOK_SECRET` | Auth webhook Zabbix/Uptime |
-| `MAPBOX_TOKEN` / `NEXT_PUBLIC_MAPBOX_*` | Peta |
 | Token WA gateway | Notifikasi assign (opsional) |
 | `STOP_CLOCK_APPROVAL_HOURS` | Threshold pause bank → butuh L1 (default `2`) |
 | `FCM_SERVER_KEY` | Legacy FCM server key (opsional) |
@@ -167,7 +166,6 @@ Lihat runbook operasional VPS: [DEPLOYMENT_VPS.md](./DEPLOYMENT_VPS.md) (domain,
 - [ ] Hapus / ganti akun seed; buat admin production
 - [ ] RLS/backup Postgres terjadwal
 - [ ] Cron terpasang & monitored (`check-dispatch`, `expire-contracts`, `remind-contracts`, `webhook-dlq`)
-- [ ] Mapbox token production
 - [ ] Storage foto (`public/uploads`) + backup
 - [ ] Uji webhook customer + DLQ replay
 - [ ] Uji GPS check-in 100m di lapangan

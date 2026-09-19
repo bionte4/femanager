@@ -2,7 +2,7 @@
 
 Platform Field Engineer Dispatch & SLA Management untuk monitoring EDC/LAN/WAN di ribuan toko se-Indonesia.
 
-Stack: **Next.js 14** (App Router) · **TypeScript** · **Tailwind** · **Prisma** · **PostgreSQL + PostGIS** · **NextAuth v5** · **Mapbox** · **PWA**
+Stack: **Next.js 14** (App Router) · **TypeScript** · **Tailwind** · **Prisma** · **PostgreSQL + PostGIS** · **NextAuth v5** · **MapLibre + OpenFreeMap** · **PWA**
 
 ## Dokumentasi
 
@@ -23,7 +23,7 @@ Stack: **Next.js 14** (App Router) · **TypeScript** · **Tailwind** · **Prisma
 
 - Node.js 20+
 - Docker Desktop (Postgres PostGIS, pgAdmin, MinIO)
-- (Opsional) Mapbox token & Fonnte token
+- (Opsional) Fonnte token
 
 ---
 
@@ -168,7 +168,6 @@ Lihat `.env.example`:
 
 - `DATABASE_URL`
 - `AUTH_SECRET` / `NEXTAUTH_SECRET`
-- `NEXT_PUBLIC_MAPBOX_TOKEN` (opsional — tanpa token map pakai fallback list)
 - `FONNTE_TOKEN` (opsional — WA notifikasi)
 - `CRON_SECRET`
 - `MONITORING_WEBHOOK_SECRET`
