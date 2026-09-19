@@ -14,14 +14,10 @@ import {
   tenantExcelRowSchema,
   type TenantPreviewRow,
 } from "@/lib/validations/tenant-excel";
-import { requireMasterAdmin } from "@/lib/rbac";
+import { requireAppAdmin, requireMasterAdmin } from "@/lib/rbac";
 
 async function requireAdmin() {
-  const session = await auth();
-  if (!session?.user || !(ADMIN_ROLES as readonly string[]).includes(session.user.role)) {
-    throw new Error("Unauthorized");
-  }
-  return session;
+  return requireAppAdmin();
 }
 
 export type ActionResult<T = undefined> =

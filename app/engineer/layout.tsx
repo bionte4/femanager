@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { auth, signOut } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
   evaluateEligibility,
@@ -68,6 +68,10 @@ export default async function EngineerLayout({
 
   if (!me) {
     redirect("/login");
+  }
+
+  if (me.is_suspended) {
+    await signOut({ redirectTo: "/login" });
   }
 
   const engagement = me.engagement_type ?? "MITRA";

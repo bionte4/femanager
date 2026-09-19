@@ -462,8 +462,12 @@ model PushDeviceToken {
 model Integration {
   id               String           @id @default(cuid())
   customer_name    String
-  /// API key plain (untuk lookup X-API-KEY). Jangan pernah log ke console.
-  api_key          String           @unique
+  /// Deprecated — jangan isi plain key baru. Null setelah migrasi prefix+hash.
+  api_key          String?          @unique
+  /// 12 char pertama untuk lookup X-API-KEY (bukan secret penuh)
+  api_key_prefix   String
+  /// 4 char terakhir untuk tampilan UI
+  api_key_last4    String           @default("")
   api_key_hash     String
   webhook_url      String?
   webhook_secret   String?
@@ -475,6 +479,7 @@ model Integration {
   external_tickets ExternalTicket[]
   dead_letters     WebhookDeadLetter[]
 
+  @@index([api_key_prefix])
   @@map("integrations")
 }
 

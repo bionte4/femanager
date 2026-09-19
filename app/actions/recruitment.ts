@@ -9,6 +9,7 @@ import {
   TransactionType,
 } from "@prisma/client";
 import { auth, ADMIN_ROLES } from "@/lib/auth";
+import { requireAppAdmin } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import {
   ageFromNik,
@@ -18,11 +19,7 @@ import {
 import { sendWhatsApp } from "@/lib/whatsapp";
 
 async function requireAdmin() {
-  const session = await auth();
-  if (!session?.user || !(ADMIN_ROLES as readonly string[]).includes(session.user.role)) {
-    throw new Error("Unauthorized");
-  }
-  return session;
+  return requireAppAdmin();
 }
 
 async function requireCoordinator() {

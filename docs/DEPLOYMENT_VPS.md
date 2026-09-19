@@ -568,7 +568,7 @@ grep -n "maplibre\|Mapbox token" components/map/monitoring-map.tsx | head
 rm -rf fetrack .next           # bersihkan nested clone + build lama
 npm install --legacy-peer-deps # peerOptional nodemailer vs next-auth
 npx prisma generate
-npx prisma migrate deploy
+npx prisma migrate deploy   # termasuk integration api_key_prefix
 npm run build                  # WAJIB sukses (harus ada .next/BUILD_ID)
 test -f .next/BUILD_ID || { echo "BUILD GAGAL"; exit 1; }
 

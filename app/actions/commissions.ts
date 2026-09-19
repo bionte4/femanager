@@ -5,13 +5,10 @@ import { DeviceType, Prisma, SlaTier, TicketType } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { auth, ADMIN_ROLES } from "@/lib/auth";
+import { requireAppAdmin } from "@/lib/rbac";
 
 async function requireAdmin() {
-  const session = await auth();
-  if (!session?.user || !(ADMIN_ROLES as readonly string[]).includes(session.user.role)) {
-    throw new Error("Unauthorized");
-  }
-  return session;
+  return requireAppAdmin();
 }
 
 export type ActionResult<T = undefined> =

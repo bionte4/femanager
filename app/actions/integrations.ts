@@ -2,18 +2,17 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { auth, ADMIN_ROLES } from "@/lib/auth";
-import { generateApiKey, hashApiKey, maskApiKey } from "@/lib/apiKey";
+import {
+  apiKeyLast4,
+  apiKeyPrefix,
+  generateApiKey,
+  hashApiKey,
+  maskApiKey,
+  maskApiKeyLast4,
+} from "@/lib/apiKey";
+import { requireSystemAdmin } from "@/lib/rbac";
 import { sendTestWebhook, sendToCustomer, type WebhookEvent } from "@/lib/webhook";
 import { z } from "zod";
-
-async function requireAdmin() {
-  const session = await auth();
-  if (!session?.user || !(ADMIN_ROLES as readonly string[]).includes(session.user.role)) {
-    throw new Error("Unauthorized");
-  }
-  return session;
-}
 
 export type ActionResult<T = undefined> =
   | { success: true; data?: T }
@@ -26,7 +25,7 @@ const createSchema = z.object({
 });
 
 export async function listIntegrations() {
-  await requireAdmin();
+  await requireSystemAdmin();
   const items = await prisma.integration.findMany({
     orderBy: { created_at: "desc" },
     include: {
@@ -37,7 +36,7 @@ export async function listIntegrations() {
   return items.map((i) => ({
     id: i.id,
     customer_name: i.customer_name,
-    api_key_masked: maskApiKey(i.api_key),
+    api_key_masked: maskApiKeyLast4(i.api_key_last4),
     webhook_url: i.webhook_url,
     is_active: i.is_active,
     last_used_at: i.last_used_at?.toISOString() ?? null,
@@ -47,7 +46,7 @@ export async function listIntegrations() {
 }
 
 export async function getIntegrationDetail(id: string) {
-  await requireAdmin();
+  await requireSystemAdmin();
   const integration = await prisma.integration.findUnique({
     where: { id },
     include: {
@@ -71,7 +70,7 @@ export async function getIntegrationDetail(id: string) {
   return {
     id: integration.id,
     customer_name: integration.customer_name,
-    api_key_masked: maskApiKey(integration.api_key),
+    api_key_masked: maskApiKeyLast4(integration.api_key_last4),
     webhook_url: integration.webhook_url,
     webhook_secret: integration.webhook_secret
       ? maskApiKey(integration.webhook_secret)
@@ -80,7 +79,9 @@ export async function getIntegrationDetail(id: string) {
     last_used_at: integration.last_used_at?.toISOString() ?? null,
     created_at: integration.created_at.toISOString(),
     external_tickets: integration.external_tickets.map((e) => {
-      const last = e.last_response as { success?: boolean; status?: number; event?: string } | null;
+      const last = e.last_response as
+        | { success?: boolean; status?: number; event?: string }
+        | null;
       return {
         id: e.id,
         external_ticket_id: e.external_ticket_id,
@@ -102,7 +103,7 @@ export async function createIntegration(input: {
   webhook_secret?: string;
 }): Promise<ActionResult<{ id: string; api_key: string }>> {
   try {
-    await requireAdmin();
+    await requireSystemAdmin();
     const data = createSchema.parse(input);
     const apiKey = generateApiKey();
     const apiKeyHash = await hashApiKey(apiKey);
@@ -110,7 +111,9 @@ export async function createIntegration(input: {
     const created = await prisma.integration.create({
       data: {
         customer_name: data.customer_name,
-        api_key: apiKey,
+        api_key: null,
+        api_key_prefix: apiKeyPrefix(apiKey),
+        api_key_last4: apiKeyLast4(apiKey),
         api_key_hash: apiKeyHash,
         webhook_url: data.webhook_url || null,
         webhook_secret: data.webhook_secret || null,
@@ -118,6 +121,7 @@ export async function createIntegration(input: {
     });
 
     revalidatePath("/admin/integrations");
+    // Plain key hanya dikembalikan sekali ke UI — tidak disimpan di DB
     return { success: true, data: { id: created.id, api_key: apiKey } };
   } catch (e) {
     return {
@@ -132,13 +136,16 @@ export async function toggleIntegration(
   is_active: boolean
 ): Promise<ActionResult> {
   try {
-    await requireAdmin();
+    await requireSystemAdmin();
     await prisma.integration.update({ where: { id }, data: { is_active } });
     revalidatePath("/admin/integrations");
     revalidatePath(`/admin/integrations/${id}`);
     return { success: true };
   } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : "Gagal update" };
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Gagal update",
+    };
   }
 }
 
@@ -147,7 +154,7 @@ export async function updateIntegrationWebhook(
   input: { webhook_url?: string; webhook_secret?: string }
 ): Promise<ActionResult> {
   try {
-    await requireAdmin();
+    await requireSystemAdmin();
     await prisma.integration.update({
       where: { id },
       data: {
@@ -160,7 +167,10 @@ export async function updateIntegrationWebhook(
     revalidatePath(`/admin/integrations/${id}`);
     return { success: true };
   } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : "Gagal update" };
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Gagal update",
+    };
   }
 }
 
@@ -168,7 +178,7 @@ export async function testIntegrationWebhook(
   id: string
 ): Promise<ActionResult<{ status?: number; body?: string }>> {
   try {
-    await requireAdmin();
+    await requireSystemAdmin();
     const integration = await prisma.integration.findUnique({ where: { id } });
     if (!integration) return { success: false, error: "Integration tidak ditemukan" };
 
@@ -193,7 +203,7 @@ export async function resendWebhook(
   event?: WebhookEvent
 ): Promise<ActionResult> {
   try {
-    await requireAdmin();
+    await requireSystemAdmin();
     const ext = await prisma.externalTicket.findUnique({
       where: { id: externalTicketId },
       include: { integration: true, internal_ticket: true },
@@ -223,11 +233,42 @@ export async function resendWebhook(
 
 export async function deleteIntegration(id: string): Promise<ActionResult> {
   try {
-    await requireAdmin();
+    await requireSystemAdmin();
     await prisma.integration.delete({ where: { id } });
     revalidatePath("/admin/integrations");
     return { success: true };
   } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : "Gagal hapus" };
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Gagal hapus",
+    };
+  }
+}
+
+/** Rotate API key — plain hanya dikembalikan sekali */
+export async function rotateIntegrationApiKey(
+  id: string
+): Promise<ActionResult<{ api_key: string }>> {
+  try {
+    await requireSystemAdmin();
+    const apiKey = generateApiKey();
+    const apiKeyHash = await hashApiKey(apiKey);
+    await prisma.integration.update({
+      where: { id },
+      data: {
+        api_key: null,
+        api_key_prefix: apiKeyPrefix(apiKey),
+        api_key_last4: apiKeyLast4(apiKey),
+        api_key_hash: apiKeyHash,
+      },
+    });
+    revalidatePath("/admin/integrations");
+    revalidatePath(`/admin/integrations/${id}`);
+    return { success: true, data: { api_key: apiKey } };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Gagal rotate key",
+    };
   }
 }

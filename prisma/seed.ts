@@ -550,24 +550,43 @@ async function main() {
 
   const demoApiKey = "api_key_customer_demo";
   const demoHash = await bcrypt.hash(demoApiKey, 10);
-  await prisma.integration.upsert({
-    where: { api_key: demoApiKey },
-    update: {
-      customer_name: "Customer Demo",
-      api_key_hash: demoHash,
-      webhook_url: "https://webhook.site/replace-me",
-      webhook_secret: "demo_webhook_secret",
-      is_active: true,
-    },
-    create: {
-      customer_name: "Customer Demo",
-      api_key: demoApiKey,
-      api_key_hash: demoHash,
-      webhook_url: "https://webhook.site/replace-me",
-      webhook_secret: "demo_webhook_secret",
-      is_active: true,
+  const existingDemo = await prisma.integration.findFirst({
+    where: {
+      OR: [
+        { api_key: demoApiKey },
+        { api_key_prefix: demoApiKey.slice(0, 12) },
+        { customer_name: "Customer Demo" },
+      ],
     },
   });
+  if (existingDemo) {
+    await prisma.integration.update({
+      where: { id: existingDemo.id },
+      data: {
+        customer_name: "Customer Demo",
+        api_key: null,
+        api_key_prefix: demoApiKey.slice(0, 12),
+        api_key_last4: demoApiKey.slice(-4),
+        api_key_hash: demoHash,
+        webhook_url: "https://webhook.site/replace-me",
+        webhook_secret: "demo_webhook_secret",
+        is_active: true,
+      },
+    });
+  } else {
+    await prisma.integration.create({
+      data: {
+        customer_name: "Customer Demo",
+        api_key: null,
+        api_key_prefix: demoApiKey.slice(0, 12),
+        api_key_last4: demoApiKey.slice(-4),
+        api_key_hash: demoHash,
+        webhook_url: "https://webhook.site/replace-me",
+        webhook_secret: "demo_webhook_secret",
+        is_active: true,
+      },
+    });
+  }
 
   console.log("→ Commission rules...");
   const commissionRules = [

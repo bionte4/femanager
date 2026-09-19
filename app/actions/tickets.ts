@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { Prisma, Role, TicketStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { auth, ADMIN_ROLES } from "@/lib/auth";
+import { requireAppAdmin } from "@/lib/rbac";
+import { requireActiveSession } from "@/lib/session-guard";
 import {
   assignEngineerSchema,
   createTicketSchema,
@@ -24,17 +26,11 @@ type ActionResult<T = undefined> =
   | { success: false; error: string };
 
 async function requireSession() {
-  const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
-  return session;
+  return requireActiveSession();
 }
 
 async function requireAdmin() {
-  const session = await requireSession();
-  if (!(ADMIN_ROLES as readonly string[]).includes(session.user.role)) {
-    throw new Error("Unauthorized");
-  }
-  return session;
+  return requireAppAdmin();
 }
 
 export async function getTickets(params: {

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { auth, ADMIN_ROLES } from "@/lib/auth";
+import { requireAppAdmin } from "@/lib/rbac";
 import {
   listWebhookDeadLetters,
   processWebhookDeadLetters,
@@ -11,11 +12,7 @@ import { getWarRoomSnapshot } from "@/lib/war-room";
 import { prisma } from "@/lib/prisma";
 
 async function requireAdmin() {
-  const session = await auth();
-  if (!session?.user || !(ADMIN_ROLES as readonly string[]).includes(session.user.role)) {
-    throw new Error("Unauthorized");
-  }
-  return session;
+  return requireAppAdmin();
 }
 
 export async function fetchWarRoomSnapshotAction() {

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { auth, CONTRACT_ADMIN_ROLES } from "@/lib/auth";
+import { requireSystemAdmin } from "@/lib/rbac";
 import {
   DEFAULT_AI,
   DEFAULT_SMTP,
@@ -32,14 +32,7 @@ type ActionResult<T = undefined> =
   | { success: false; error: string };
 
 async function requireSettingsAdmin() {
-  const session = await auth();
-  if (
-    !session?.user ||
-    !(CONTRACT_ADMIN_ROLES as readonly string[]).includes(session.user.role)
-  ) {
-    throw new Error("Unauthorized — SUPER_ADMIN / ADMIN_NOC");
-  }
-  return session;
+  return requireSystemAdmin();
 }
 
 export type IntegrationsPublicConfig = {

@@ -3,14 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { auth, ADMIN_ROLES } from "@/lib/auth";
+import { requireAppAdmin } from "@/lib/rbac";
 import { slaConfigSchema, type SlaConfigInput } from "@/lib/validations/master";
 
 async function requireAdmin() {
-  const session = await auth();
-  if (!session?.user || !(ADMIN_ROLES as readonly string[]).includes(session.user.role)) {
-    throw new Error("Unauthorized");
-  }
-  return session;
+  return requireAppAdmin();
 }
 
 type ActionResult = { success: true } | { success: false; error: string };

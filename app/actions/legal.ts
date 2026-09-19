@@ -10,6 +10,7 @@ import {
   Prisma,
 } from "@prisma/client";
 import { auth, ADMIN_ROLES } from "@/lib/auth";
+import { requireAppAdmin } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import {
   AGREEMENT_TITLE,
@@ -19,11 +20,7 @@ import {
 } from "@/lib/legal/agreement-template";
 
 async function requireAdmin() {
-  const session = await auth();
-  if (!session?.user || !(ADMIN_ROLES as readonly string[]).includes(session.user.role)) {
-    throw new Error("Unauthorized");
-  }
-  return session;
+  return requireAppAdmin();
 }
 
 export async function ensurePendingAgreementForEngineer(engineerId: string) {
