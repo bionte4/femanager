@@ -5,6 +5,15 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { auth, ADMIN_ROLES } from "@/lib/auth";
 import { tenantSchema, type TenantInput } from "@/lib/validations/master";
+import {
+  EXCEL_IMPORT_MAX_ROWS,
+  normalizeExcelHeaders,
+  parseBoolCell,
+} from "@/lib/excel";
+import {
+  tenantExcelRowSchema,
+  type TenantPreviewRow,
+} from "@/lib/validations/tenant-excel";
 
 async function requireAdmin() {
   const session = await auth();
@@ -148,4 +157,200 @@ export async function getTenantOptions() {
     select: { id: true, name: true, code: true },
     orderBy: { name: "asc" },
   });
+}
+
+export async function getTenantsForExport() {
+  await requireAdmin();
+  const rows = await prisma.tenant.findMany({
+    orderBy: { code: "asc" },
+    take: 5000,
+  });
+  return rows.map((t) => ({
+    code: t.code,
+    name: t.name,
+    address: t.address,
+    province: t.province,
+    city: t.city,
+    district: t.district,
+    sub_district: t.sub_district ?? "",
+    lat: t.lat,
+    lng: t.lng,
+    pic_name: t.pic_name ?? "",
+    pic_phone: t.pic_phone ?? "",
+    sla_tier: t.sla_tier,
+    is_active: t.is_active,
+  }));
+}
+
+export async function previewTenantsImport(
+  rawRows: Record<string, unknown>[]
+): Promise<
+  ActionResult<{ rows: TenantPreviewRow[]; okCount: number; errorCount: number }>
+> {
+  try {
+    await requireAdmin();
+    if (!Array.isArray(rawRows) || rawRows.length === 0) {
+      return { success: false, error: "File kosong / tidak ada baris data" };
+    }
+    if (rawRows.length > EXCEL_IMPORT_MAX_ROWS) {
+      return {
+        success: false,
+        error: `Maksimal ${EXCEL_IMPORT_MAX_ROWS} baris per import`,
+      };
+    }
+
+    const codes = rawRows
+      .map((r) => {
+        const n = normalizeExcelHeaders(r);
+        return String(n.code ?? "")
+          .trim()
+          .toUpperCase();
+      })
+      .filter(Boolean);
+
+    const existing = await prisma.tenant.findMany({
+      where: { code: { in: codes } },
+      select: { id: true, code: true },
+    });
+    const byCode = new Map(existing.map((e) => [e.code.toUpperCase(), e]));
+
+    const seen = new Set<string>();
+    const rows: TenantPreviewRow[] = [];
+
+    rawRows.forEach((raw, idx) => {
+      const n = normalizeExcelHeaders(raw);
+      const parsed = tenantExcelRowSchema.safeParse({
+        code: n.code,
+        name: n.name,
+        address: n.address,
+        province: n.province,
+        city: n.city,
+        district: n.district,
+        sub_district: n.sub_district ? String(n.sub_district) : null,
+        lat: n.lat,
+        lng: n.lng,
+        pic_name: n.pic_name ? String(n.pic_name) : null,
+        pic_phone: n.pic_phone ? String(n.pic_phone) : null,
+        sla_tier: n.sla_tier,
+        is_active: parseBoolCell(n.is_active, true),
+      });
+
+      const errors: string[] = [];
+      if (!parsed.success) {
+        for (const issue of parsed.error.issues) {
+          errors.push(`${issue.path.join(".")}: ${issue.message}`);
+        }
+      }
+
+      const data = parsed.success ? parsed.data : null;
+      const codeKey = (data?.code ?? String(n.code ?? "")).toUpperCase();
+      if (codeKey && seen.has(codeKey)) errors.push("code duplikat di file");
+      if (codeKey) seen.add(codeKey);
+
+      const exist = codeKey ? byCode.get(codeKey) : undefined;
+      const action: TenantPreviewRow["action"] =
+        errors.length > 0 ? "error" : exist ? "update" : "create";
+
+      rows.push({
+        row: idx + 2,
+        code: data?.code ?? String(n.code ?? ""),
+        name: data?.name ?? String(n.name ?? ""),
+        city: data?.city ?? String(n.city ?? ""),
+        sla_tier: data?.sla_tier ?? String(n.sla_tier ?? ""),
+        action,
+        existing_id: exist?.id,
+        payload: data ?? undefined,
+        errors,
+      });
+    });
+
+    const okCount = rows.filter((r) => r.action !== "error").length;
+    return {
+      success: true,
+      data: { rows, okCount, errorCount: rows.length - okCount },
+    };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Gagal preview",
+    };
+  }
+}
+
+export async function commitTenantsImport(
+  previewRows: TenantPreviewRow[]
+): Promise<ActionResult<{ created: number; updated: number }>> {
+  try {
+    await requireAdmin();
+    const valid = previewRows.filter(
+      (r) => (r.action === "create" || r.action === "update") && r.payload
+    );
+    if (valid.length === 0) {
+      return { success: false, error: "Tidak ada baris valid" };
+    }
+
+    const recheck = await previewTenantsImport(
+      valid.map((r) => ({ ...r.payload! }))
+    );
+    if (!recheck.success || !recheck.data) {
+      return { success: false, error: recheck.success === false ? recheck.error : "Revalidasi gagal" };
+    }
+    if (recheck.data.errorCount > 0) {
+      return { success: false, error: "Data berubah / invalid — preview ulang" };
+    }
+
+    let created = 0;
+    let updated = 0;
+    for (const r of recheck.data.rows) {
+      if (!r.payload) continue;
+      const p = r.payload;
+      if (r.action === "update" && r.existing_id) {
+        await prisma.tenant.update({
+          where: { id: r.existing_id },
+          data: {
+            name: p.name,
+            address: p.address,
+            province: p.province,
+            city: p.city,
+            district: p.district,
+            sub_district: p.sub_district || null,
+            lat: p.lat,
+            lng: p.lng,
+            pic_name: p.pic_name || null,
+            pic_phone: p.pic_phone || null,
+            sla_tier: p.sla_tier,
+            is_active: p.is_active,
+          },
+        });
+        updated += 1;
+      } else {
+        await prisma.tenant.create({
+          data: {
+            code: p.code,
+            name: p.name,
+            address: p.address,
+            province: p.province,
+            city: p.city,
+            district: p.district,
+            sub_district: p.sub_district || null,
+            lat: p.lat,
+            lng: p.lng,
+            pic_name: p.pic_name || null,
+            pic_phone: p.pic_phone || null,
+            sla_tier: p.sla_tier,
+            is_active: p.is_active,
+          },
+        });
+        created += 1;
+      }
+    }
+
+    revalidatePath("/admin/tenants");
+    return { success: true, data: { created, updated } };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Gagal import",
+    };
+  }
 }

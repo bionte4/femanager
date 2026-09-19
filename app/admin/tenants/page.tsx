@@ -25,7 +25,7 @@ export default async function TenantsPage({ searchParams }: PageProps) {
     <div className="space-y-3">
       <PageHeader
         title="Tenants"
-        description="Kelola toko / tenant se-Indonesia dengan koordinat GPS."
+        description="Kelola tenant dengan koordinat GPS. Bulk via Excel + preview."
       />
       <Suspense fallback={null}>
         <TenantsWorkspace

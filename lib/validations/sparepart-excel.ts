@@ -1,5 +1,8 @@
 import { LocationType } from "@prisma/client";
 import { z } from "zod";
+import { normalizeExcelHeaders } from "@/lib/excel";
+
+export { normalizeExcelHeaders };
 
 export const sparepartExcelRowSchema = z.object({
   sku: z.string().min(1, "SKU wajib").max(64),
@@ -33,12 +36,3 @@ export const SPAREPART_EXCEL_HEADERS = [
   "location_type",
   "holder_phone",
 ] as const;
-
-export function normalizeExcelHeaders(raw: Record<string, unknown>) {
-  const map: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(raw)) {
-    const key = k.trim().toLowerCase().replace(/\s+/g, "_");
-    map[key] = v;
-  }
-  return map;
-}

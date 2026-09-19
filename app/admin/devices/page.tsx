@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { getDevices } from "@/app/actions/devices";
 import { getTenantOptions } from "@/app/actions/tenants";
 import { DevicesTable } from "@/components/admin/devices-table";
+import { DevicesExcelTools } from "@/components/admin/devices-excel-tools";
 import {
   Pagination,
   SearchFilterBar,
@@ -24,11 +25,14 @@ export default async function DevicesPage({ searchParams }: PageProps) {
 
   return (
     <div className="space-y-3">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Devices</h1>
-        <p className="text-xs text-muted-foreground">
-          Perangkat EDC / Router / Switch yang terhubung ke tenant.
-        </p>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Devices</h1>
+          <p className="text-xs text-muted-foreground">
+            Perangkat EDC / Router / Switch. Bulk via Excel dengan preview.
+          </p>
+        </div>
+        <DevicesExcelTools />
       </div>
 
       <Suspense fallback={null}>

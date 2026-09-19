@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { TenantsTable } from "@/components/admin/tenants-table";
+import { TenantsExcelTools } from "@/components/admin/tenants-excel-tools";
 import {
   Pagination,
   SearchFilterBar,
@@ -34,15 +35,18 @@ export function TenantsWorkspace({
         cities={cities}
         placeholder="Cari nama, kode, atau alamat..."
         actions={
-          <Button
-            onClick={() => {
-              setCreateNonce((n) => n + 1);
-              setOpen(true);
-            }}
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Tambah Tenant
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <TenantsExcelTools />
+            <Button
+              onClick={() => {
+                setCreateNonce((n) => n + 1);
+                setOpen(true);
+              }}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Tambah Tenant
+            </Button>
+          </div>
         }
       />
       <TenantsTable
