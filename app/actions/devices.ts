@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { auth, ADMIN_ROLES } from "@/lib/auth";
 import { deviceSchema, type DeviceInput } from "@/lib/validations/master";
 import {
   EXCEL_IMPORT_MAX_ROWS,
@@ -14,14 +13,6 @@ import {
   type DevicePreviewRow,
 } from "@/lib/validations/device-excel";
 import { requireMasterAdmin } from "@/lib/rbac";
-
-async function requireAdmin() {
-  const session = await auth();
-  if (!session?.user || !(ADMIN_ROLES as readonly string[]).includes(session.user.role)) {
-    throw new Error("Unauthorized");
-  }
-  return session;
-}
 
 type ActionResult<T = undefined> =
   | { success: true; data?: T }
