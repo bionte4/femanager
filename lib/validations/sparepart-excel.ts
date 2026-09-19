@@ -36,3 +36,11 @@ export const SPAREPART_EXCEL_HEADERS = [
   "location_type",
   "holder_phone",
 ] as const;
+
+export const SPAREPART_SAMPLE_ROW = {
+  sku: "EDC-BCA-01",
+  name: "EDC BCA Contoh",
+  stock_qty: 5,
+  location_type: "WAREHOUSE",
+  holder_phone: "",
+};

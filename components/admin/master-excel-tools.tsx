@@ -99,6 +99,20 @@ export function MasterExcelTools<
     }
   }
 
+  function handleDownloadTemplate() {
+    try {
+      const sheet = XLSX.utils.json_to_sheet([sampleRow], {
+        header: [...headers],
+      });
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, sheet, sheetName);
+      XLSX.writeFile(wb, `${filePrefix}-template.xlsx`);
+      toast.success(`Template ${entityLabel} diunduh`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Gagal unduh template");
+    }
+  }
+
   async function handleFile(file: File) {
     try {
       const buf = await file.arrayBuffer();
@@ -147,6 +161,15 @@ export function MasterExcelTools<
   return (
     <>
       <div className="flex flex-wrap gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8"
+          onClick={handleDownloadTemplate}
+        >
+          <FileSpreadsheet className="h-3.5 w-3.5" />
+          Unduh Template
+        </Button>
         <Button
           variant="outline"
           size="sm"

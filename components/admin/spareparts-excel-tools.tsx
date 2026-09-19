@@ -11,7 +11,10 @@ import {
   previewSparepartsImport,
 } from "@/app/actions/spareparts";
 import type { SparepartPreviewRow } from "@/lib/validations/sparepart-excel";
-import { SPAREPART_EXCEL_HEADERS } from "@/lib/validations/sparepart-excel";
+import {
+  SPAREPART_EXCEL_HEADERS,
+  SPAREPART_SAMPLE_ROW,
+} from "@/lib/validations/sparepart-excel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,15 +55,7 @@ export function SparepartsExcelTools() {
               location_type: r.location_type,
               holder_phone: r.holder_phone,
             }))
-          : [
-              {
-                sku: "EDC-BCA-01",
-                name: "EDC BCA Contoh",
-                stock_qty: 5,
-                location_type: "WAREHOUSE",
-                holder_phone: "",
-              },
-            ],
+          : [SPAREPART_SAMPLE_ROW],
         { header: [...SPAREPART_EXCEL_HEADERS] }
       );
       const wb = XLSX.utils.book_new();
@@ -71,6 +66,20 @@ export function SparepartsExcelTools() {
       toast.error(e instanceof Error ? e.message : "Gagal export");
     } finally {
       setExporting(false);
+    }
+  }
+
+  function handleDownloadTemplate() {
+    try {
+      const sheet = XLSX.utils.json_to_sheet([SPAREPART_SAMPLE_ROW], {
+        header: [...SPAREPART_EXCEL_HEADERS],
+      });
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, sheet, "spareparts");
+      XLSX.writeFile(wb, "spareparts-template.xlsx");
+      toast.success("Template Spareparts diunduh");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Gagal unduh template");
     }
   }
 
