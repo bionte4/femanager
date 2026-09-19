@@ -1,18 +1,24 @@
-/* FE-Track simple service worker — cache app shell untuk offline */
-const CACHE = "fetrack-v1";
+/* FE-Track service worker — cache app shell saja; jangan sentuh tile peta / cross-origin */
+const CACHE = "fetrack-v2";
 const PRECACHE = ["/", "/engineer/my-tickets", "/login", "/manifest.json"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(PRECACHE)).then(() => self.skipWaiting())
+    caches
+      .open(CACHE)
+      .then((cache) => cache.addAll(PRECACHE))
+      .then(() => self.skipWaiting())
   );
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
-    ).then(() => self.clients.claim())
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
+      )
+      .then(() => self.clients.claim())
   );
 });
 
@@ -21,21 +27,53 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
 
   const url = new URL(request.url);
-  // Jangan cache API / auth
-  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/api")) return;
+
+  // PENTING: biarkan browser handle tile MapLibre/Esri/dll (cross-origin).
+  // Intercept + fallback HTML bikin peta abu-abu di mobile/PWA.
+  if (url.origin !== self.location.origin) return;
+
+  // Jangan cache API / auth / file privat
+  if (
+    url.pathname.startsWith("/api/") ||
+    url.pathname.startsWith("/uploads/") ||
+    url.pathname.startsWith("/_next/webpack-hmr")
+  ) {
+    return;
+  }
+
+  // Hanya navigasi dokumen + asset same-origin
+  const accept = request.headers.get("accept") || "";
+  const isDocument =
+    request.mode === "navigate" || accept.includes("text/html");
+  const isStaticAsset =
+    url.pathname.startsWith("/_next/static/") ||
+    url.pathname.startsWith("/icons/") ||
+    url.pathname === "/manifest.json";
+
+  if (!isDocument && !isStaticAsset) return;
 
   event.respondWith(
     fetch(request)
       .then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE).then((cache) => cache.put(request, copy));
+        if (response.ok && (isDocument || isStaticAsset)) {
+          const copy = response.clone();
+          void caches.open(CACHE).then((cache) => cache.put(request, copy));
+        }
         return response;
       })
-      .catch(() => caches.match(request).then((cached) => cached || caches.match("/engineer/my-tickets")))
+      .catch(() =>
+        caches
+          .match(request)
+          .then(
+            (cached) =>
+              cached ||
+              (isDocument ? caches.match("/engineer/my-tickets") : undefined)
+          )
+      )
   );
 });
 
-/** FCM / Web Push: tampilkan notifikasi saat app di background */
+/** FCM / Web Push */
 self.addEventListener("push", (event) => {
   let title = "FE-Track";
   let body = "Ada update ticket";
@@ -50,7 +88,7 @@ self.addEventListener("push", (event) => {
       href = data.href || data.click_action || href;
     }
   } catch {
-    // ignore parse error
+    /* ignore */
   }
 
   event.waitUntil(
@@ -67,14 +105,16 @@ self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const href = event.notification.data?.href || "/engineer/my-tickets";
   event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
-      for (const client of clients) {
-        if ("focus" in client) {
-          client.navigate?.(href);
-          return client.focus();
+    self.clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((clients) => {
+        for (const client of clients) {
+          if ("focus" in client) {
+            client.navigate?.(href);
+            return client.focus();
+          }
         }
-      }
-      if (self.clients.openWindow) return self.clients.openWindow(href);
-    })
+        if (self.clients.openWindow) return self.clients.openWindow(href);
+      })
   );
 });

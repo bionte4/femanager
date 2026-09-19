@@ -226,7 +226,7 @@ export function MonitoringMap() {
 
   createTicketRef.current = handleCreateTicket;
 
-  // Init map sekali — MapLibre + raster CARTO (gratis, stabil)
+  // Init map sekali — MapLibre + Esri raster
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
@@ -236,16 +236,40 @@ export function MonitoringMap() {
       style: DEFAULT_MAP_STYLE,
       center: DEFAULT_MAP_CENTER,
       zoom: 10,
+      // Mobile Safari: jangan gagal karena "performance caveat"
+      failIfMajorPerformanceCaveat: false,
     });
 
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
     map.addControl(new maplibregl.FullscreenControl(), "bottom-right");
 
-    // Flex layout sering bikin canvas 0px → resize setelah mount
-    const resize = () => map.resize();
-    const ro = new ResizeObserver(resize);
+    const resize = () => {
+      try {
+        if (!map.getContainer()) return;
+        map.resize();
+      } catch {
+        /* ignore during WebGL restore */
+      }
+    };
+
+    const ro = new ResizeObserver(() => resize());
     ro.observe(container);
-    requestAnimationFrame(resize);
+
+    // Mobile: viewport chrome / rotate / PWA resume
+    const onViewport = () => resize();
+    window.addEventListener("orientationchange", onViewport);
+    window.visualViewport?.addEventListener("resize", onViewport);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") {
+        resize();
+        // Paksa redraw tile setelah PWA resume
+        map.triggerRepaint();
+      }
+    });
+
+    const resizeTimers = [0, 100, 300, 800].map((ms) =>
+      window.setTimeout(resize, ms)
+    );
 
     map.on("load", () => {
       resize();
@@ -352,9 +376,16 @@ export function MonitoringMap() {
       });
     });
 
+    map.on("error", (e) => {
+      console.warn("[monitoring-map]", e.error ?? e);
+    });
+
     mapRef.current = map;
 
     return () => {
+      resizeTimers.forEach((id) => window.clearTimeout(id));
+      window.removeEventListener("orientationchange", onViewport);
+      window.visualViewport?.removeEventListener("resize", onViewport);
       ro.disconnect();
       popupRef.current?.remove();
       engineerMarkersRef.current.forEach((m) => m.remove());
@@ -502,8 +533,8 @@ export function MonitoringMap() {
         </span>
       </div>
 
-      <div className="relative min-h-0 flex-1 overflow-hidden rounded-xl border bg-muted/30">
-        <div ref={mapContainerRef} className="h-full w-full" />
+      <div className="relative min-h-[280px] flex-1 overflow-hidden rounded-xl border bg-muted/30 sm:min-h-[360px]">
+        <div ref={mapContainerRef} className="absolute inset-0 h-full w-full" />
 
         {(query.isLoading || creating) && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/40 backdrop-blur-[1px]">
