@@ -241,7 +241,7 @@ SEED_PASSWORD='DemoShow2026!' npx tsx scripts/seed-demo-ops.ts
 
 ### Reset password
 
-1. **Self-service OTP WhatsApp** — `/forgot-password` (butuh Fonnte aktif di Integrations)
+1. **Self-service OTP** — `/forgot-password` (WA Fonnte dan/atau Telegram chat ID engineer)
 2. **Admin UI** — Engineers → Edit → Reset password
 3. **CLI**:
 ```bash
@@ -250,6 +250,15 @@ RESET_PHONE='081222222001' RESET_PASS='PasswordBaru123' \
 ```
 
 OTP: 6 digit, berlaku 10 menit, max 3 kirim/jam per nomor.
+
+### Telegram Bot (gratis)
+
+1. Buat bot di `@BotFather` → dapatkan token  
+2. Chat bot dari akun admin → buka `https://api.telegram.org/bot<TOKEN>/getUpdates` → salin `chat.id`  
+3. `/admin/integrations` → kartu **Telegram Bot** → token + admin chat ID → Test  
+4. Opsional: isi **Telegram Chat ID** di Edit Engineer (dispatch/OTP juga ke Telegram)  
+
+Env fallback: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ADMIN_CHAT_ID`.
 
 ---
 
