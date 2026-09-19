@@ -1,37 +1,45 @@
 # FE-Track — Kerangka Pitch Deck
-### Untuk CEO & Investor | Marketplace Field Engineer Indonesia
+### Fokus jual: **Marketplace tenaga kerja freelance Field Engineer**
 
 **Durasi saran:** 12–15 menit + 10 menit Q&A  
-**Nada:** tajam, operasional, credible — bukan “AI hype”  
+**Nada:** tajam, supply–demand, credible  
+**Yang dijual (hero):** kemampuan **mencari, menyaring, dan mengerahkan** tenaga kerja freelance lapangan (FE) ke titik toko yang butuh perbaikan.  
+**Bukan hero:** “kami jual software SLA” — SLA/NOC adalah **bukti kualitas & trust** agar buyer berani pakai freelance.
+
 **Satu kalimat positioning:**  
-> *SLA Field Ops OS* — marketplace + NOC yang membuat jaringan toko nasional bisa dijamin 99% uptime.
+> *Marketplace freelance Field Engineer* — temukan teknisi terdekat yang skill-nya cocok, siap kerja hari ini, dengan jejak bukti yang bisa diaudit.
 
-**Outline visual interaktif (Canvas):** buka `pitch-deck-visual-outline` di panel Canvas Cursor — navigator 18 slide + Act A–E + speaker notes.
-
-Gunakan file ini sebagai **script slide-by-slide** (PowerPoint / Pitch / Google Slides).  
-Setiap slide: **headline kuat** + **1 visual** + **speaker note**.
+**Outline visual:**
+- Browser: [`pitch-deck-outline.html`](./pitch-deck-outline.html)
+- Cursor Canvas: `pitch-deck-visual-outline` → Command Palette → **Open Canvas**
 
 ---
 
-## Desain visual (wajib konsisten)
+## Desain visual
 
 | Elemen | Arah |
 |--------|------|
-| Warna | Dark navy + hijau “SLA meet” + aksen amber “breach” — hindari ungu generik |
-| Tipografi | Display kuat untuk headline; body pendek |
-| Visual hero | Peta Indonesia + titik toko merah/hijau + FE di jalan |
-| Data | Angka besar, max 3 KPI per slide |
-| Larangan | Wall of text, 10 bullet, screenshot UI penuh tanpa cerita |
+| Warna | Dark navy + hijau “matched/available” + amber “shortage” |
+| Hero visual | Peta + pin FE available + toko butuh bantuan (bukan dashboard KPI dulu) |
+| Data | Coverage kota, time-to-fill, % match skill, accept rate |
+| Larangan | Wall of text; jangan buka dengan fitur NOC/SLA |
 
-**Aturan emas:** setiap slide harus bisa dibaca dalam **5 detik**.
+**Aturan emas:** slide pertama harus menjawab *“dari mana saya dapat FE freelance yang bisa diandalkan?”*
 
 ---
 
-## Alur narasi (arc investor)
+## Alur narasi (arc)
 
 ```
-Pain nasional → Why now → Solusi OS → Marketplace dual mode
-→ Market & money → Moat → Traction/product → GTM → Ask → Vision
+Shortage FE & cara lama gagal
+→ Why marketplace sekarang
+→ Produk = match + dispatch + trust
+→ Mitra freelance (inti) + PKWT (opsional enterprise)
+→ Siapa bayar & unit ekonomi take-rate
+→ Moat supply daerah
+→ Traction product
+→ GTM supply+demand
+→ Ask → Vision
 ```
 
 ---
@@ -40,286 +48,230 @@ Pain nasional → Why now → Solusi OS → Marketplace dual mode
 
 ### Slide 1 — Title
 **Headline:** FE-Track  
-**Sub:** Marketplace Field Engineer + SLA Operating System untuk jaringan toko se-Indonesia  
-**Footer:** Confidential | [Tanggal] | [Nama presenter]
+**Sub:** Marketplace tenaga kerja freelance Field Engineer untuk jaringan toko se-Indonesia  
+**Footer:** Confidential | [Tanggal] | [Nama]
 
-*Visual:* full-bleed map cluster toko + FE en-route (bukan logo kecil di sudut).
+*Visual:* peta + FE available (hijau) mengarah ke toko down (merah).
 
-**Speaker:** “Kami membangun sistem operasi lapangan untuk SLA 99% — bukan sekadar ticketing.”
+**Speaker:** “Kami menjual akses ke tenaga kerja freelance lapangan — yang tepat skill, tepat lokasi, bisa dikerahkan cepat.”
 
 ---
 
-### Slide 2 — The Cost of Silence
-**Headline:** Satu EDC down di toko = transaksi hilang. Ribuan toko = risiko sistemik.  
-**3 angka besar (isi dengan estimasi yang bisa kalian bela):**
-- Rp ___ / jam lost sales per toko down
-- ___ menit rata-rata response hari ini (WA / manual)
-- ___% ticket tanpa bukti GPS + foto before/after
+### Slide 2 — The Hiring Pain
+**Headline:** Mencari FE freelance masih lewat WA group, kenalan, dan tebak-tebakan.  
+**3 pain besar:**
+- Tidak tahu siapa **available** di kota X hari ini  
+- Salah orang → skill tidak cocok / terlalu jauh → mahal & telat  
+- Tidak ada jejak → sulit percaya freelance untuk job kritis (EDC/bank)
 
-*Visual:* timeline “Alert → WA group → FE salah kota → SLA breach → dispute bank”.
+*Visual:* “Broadcast WA 50 orang → 3 balas → 1 datang → skill salah”.
 
-**Speaker:** Buka dengan rasa sakit CEO merchant/bank — bukan fitur software.
+**Speaker:** Problem buyer bukan “kurang software” — problem mereka **kekurangan pipeline tenaga kerja yang terverifikasi**.
 
 ---
 
 ### Slide 3 — Why Now
-**Headline:** Infrastruktur retail digital sudah nasional. Operasi lapangan belum.  
-**3 driver:**
-1. Densitas EDC / SDWAN / CCTV / WiFi toko naik tajam  
-2. SLA customer (bank, MSP) makin ketat & diaudit  
-3. Talent teknis daerah tersedia — tapi belum ter-orchestrate  
+**Headline:** Demand perbaikan toko naik. Supply teknisi daerah ada — belum terhubung.  
+1. Jaringan EDC/LAN/WAN/SDWAN makin padat  
+2. Vendor tunggal tidak scalable ke kabupaten  
+3. Gen Z/SMK teknis siap freelance — butuh platform job yang adil  
 
-*Visual:* “Demand up × Ops still WhatsApp = opportunity”
+*Visual:* Demand up × supply fragmented = marketplace opportunity.
 
 ---
 
-# BAGIAN B — Problem & Solution (Slide 4–7)
+# BAGIAN B — Product = Marketplace (Slide 4–7)
 
-### Slide 4 — Broken Status Quo
-**Headline:** Field service masih dijalankan seperti grup chat.  
+### Slide 4 — Broken Status Quo (sourcing)
+**Headline:** Cara lama mencari orang = tidak scalable.  
 | Cara lama | Akibat |
 |-----------|--------|
-| Assign manual / WA | Lambat, bias, tidak scalable |
-| FE salah skill / jauh | Biaya tinggi, breach |
-| Alert monitoring dobel | Noise NOC |
-| Tidak ada bukti on-site | Dispute & fraud |
-| Komisi tidak jelas | FE churn |
-
-*Visual:* 1 diagram “chaos stack” → silang merah.
+| WA / grup kota | Noise, tidak terukur |
+| Vendor tetap | Mahal, coverage tipis di daerah |
+| Hire full-time | Overkill untuk spike ticket |
+| “Kenalan” | Tidak audit skill & lokasi |
 
 ---
 
-### Slide 5 — The Product
-**Headline:** FE-Track = NOC + Marketplace FE + Trust Layer dalam satu OS.  
-**4 pilar (ikon besar):**
-1. **Dispatch cerdas** — jarak + skill + sertifikasi  
-2. **SLA governance** — countdown, stop-clock, laporan fase, PDF customer  
-3. **Trust** — GPS 100m, foto before/after, anti-fraud  
-4. **Dual workforce** — Mitra (komisi) + PKWT (kontrak/placement)
+### Slide 5 — What We Sell
+**Headline:** Satu tempat untuk **cari → match → kerahkan → bayar** FE freelance.  
+**4 pilar (urutan jual):**
+1. **Supply** — FE daftar, skill, kota, status available  
+2. **Match** — jarak + skill + sertifikasi (+ placement bila perlu)  
+3. **Dispatch** — assign / accept 15 menit / auto cari pengganti  
+4. **Trust & pay** — GPS/foto bukti + wallet komisi Mitra  
 
-*Visual:* arsitektur 1 slide: Monitoring → NOC L0/L1 → Dispatch → FE PWA → Wallet/Payroll → Customer ITSM.
+*Visual:* funnel “Job masuk → kandidat terdekat → accept → on-site → bayar”.
 
----
-
-### Slide 6 — How a Ticket Lives (Demo story)
-**Headline:** Dari alert sampai resolved — tanpa grup WhatsApp.  
-**Flow horizontal (6 step):**
-`Alert → Dedup → L0 triage → L1 assign → FE accept → Check-in 100m → Resolve + bukti → Komisi/Payroll`
-
-*Visual:* storyboard; highlight **15 menit accept timeout** & **auto re-assign**.
-
-**Speaker:** Ceritakan 1 ticket seolah live demo (bahkan tanpa buka laptop).
+**Speaker:** SLA dashboard adalah bonus kredibilitas — **produk yang dibeli adalah tenaga kerja yang ketemu.**
 
 ---
 
-### Slide 7 — Marketplace, tapi Compliant
-**Headline:** Dua mode kerja. Satu platform. Legal & unit economics terpisah.  
-| | **Mitra** | **PKWT** |
-|--|-----------|----------|
-| Model | Marketplace kemitraan | Kontrak kerja |
-| Bayar | Fee / ticket (wallet) | Payroll HR |
-| Reject job | Bebas (bukti kemitraan) | Tidak |
-| Coverage | Fleksibel nasional | Placement kota/client |
+### Slide 6 — Job story (60 detik)
+**Headline:** Dari “butuh orang” sampai “orang di lokasi”.  
+`Ticket/job → auto cari FE terdekat + skill cocok → notifikasi → Accept → OTW → check-in 100m → selesai → komisi`
 
-*Visual:* dua jalur paralel — “scale” vs “dedicated client”.
+Highlight: timeout 15 menit = sistem **cari orang lain**, bukan menunggu kenalan.
 
-**Speaker (CEO/investor care):** “Kami tidak campur gaji karyawan dengan fee marketplace — isolasi pay sudah di-build.”
+---
+
+### Slide 7 — Model tenaga kerja
+**Headline:** Inti jual = **Mitra freelance**. PKWT = opsi enterprise.  
+| | **Mitra (hero jual)** | PKWT (pelengkap) |
+|--|----------------------|------------------|
+| Relasi | Freelance / kemitraan | Kontrak kerja |
+| Cara dapat job | Marketplace match | Placement client/kota |
+| Bayar | Fee per ticket (wallet) | Payroll HR |
+| Pesan ke buyer | “Isi coverage fleksibel” | “Dedicated crew” |
+
+**Speaker:** Jangan campur pesan. Di deck ini, **yang dijual dulu = akses Mitra freelance.**
 
 ---
 
 # BAGIAN C — Market & Money (Slide 8–11)
 
-### Slide 8 — Who Pays
-**Headline:** Pembeli = pemilik risiko SLA.  
-**4 segmen (kartu):**
-- Bank / acquirer EDC  
-- ISP / SDWAN MSP  
-- Retail chain / franchise  
-- Vendor NOC / field service outsourcing  
+### Slide 8 — Who Pays for Talent Access
+**Headline:** Yang bayar = yang butuh orang di lapangan.  
+- Bank / acquirer / merchant network  
+- ISP / MSP SDWAN  
+- Retail chain  
+- Vendor field service yang kehabisan crew  
 
-*Visual:* logos placeholder + “ICP beachhead: Jabodetabek Tier-1 EDC”.
+Value prop: **time-to-fill** turun, quality naik, tanpa hire massal.
 
 ---
 
-### Slide 9 — Market Size (kerangka — isi angka kalian)
-**Headline:** Pasar field ops retail Indonesia cukup besar untuk membangun category king.  
+### Slide 9 — Market (talent marketplace lens)
+**Headline:** Dua sisi marketplace.  
 ```
-TAM  — seluruh field service IT retail / payment / MSP Indonesia
-SAM  — jaringan toko dengan SLA perangkat (EDC/LAN/WAN/SDWAN)
-SOM  — 1–2 pilot bank/MSP + 1–3 kota (12 bulan)
+Demand — ticket perbaikan / PM di ribuan toko
+Supply — FE freelance SMK/S1 di kota & kabupaten
+Liquidity — match geo + skill = transaksi fee
 ```
-*Visual:* funnel TAM→SAM→SOM.  
-**Catatan:** jangan mengarang angka; sisakan “working draft” atau sumber riset.
+SOM 12 bulan: 1–3 kota padat ticket + 50–100 FE aktif.
 
 ---
 
 ### Slide 10 — Business Model
-**Headline:** Revenue bertingkat — SaaS + take-rate ticket + integrasi.  
+**Headline:** Uang mengikuti match yang berhasil.  
 | Stream | Logika |
 |--------|--------|
-| SaaS / toko / bulan | Recurring dari jaringan aktif |
-| Margin ticket | `price_customer − fee_FE` |
-| Integration & SLA PDF | Setup + retainer ITSM |
-| Premium NOC / War Room | Dedicated ops |
-| Recruitment & sertifikasi | Supply-side monetization |
-
-*Visual:* stacked revenue bars “Year 1 → Year 3” (placeholder).
+| Take-rate / margin ticket | `price_customer − fee_FE` |
+| SaaS akses jaringan toko | Recurring untuk demand side |
+| Recruitment & sertifikasi | Monetisasi supply onboarding |
+| Premium “priority pool” | FE tersertifikasi / kota sulit |
 
 ---
 
-### Slide 11 — Unit Economics (1 ticket)
-**Headline:** Setiap ticket ontime = unit profit yang bisa diukur.  
+### Slide 11 — Unit Economics (1 fill)
+**Headline:** 1 job terisi ontime = 1 unit ekonomi marketplace.  
 ```
-Revenue ticket
-− Fee Mitra / cost PKWT
-− Bonus ontime (+ Penalty breach)
-− Cost platform (WA, map, hosting, NOC share)
-= Contribution margin
+Revenue job
+− Fee freelance
+− Cost notifikasi / map / support
+= Contribution per fill
 ```
-**KPI produk yang sudah ada:** SLA Meet %, MTTR fase, coverage FE, fraud hold rate.
-
-*Visual:* waterfall margin 1 ticket.
+KPI supply-side: available FE / kota, accept rate, time-to-accept, fill rate, churn FE.
 
 ---
 
 # BAGIAN D — Moat & Traction (Slide 12–15)
 
-### Slide 12 — Why We Win
-**Headline:** Bukan ITSM generik. Field-first + trust + dual workforce.  
-**Moat bertumpuk:**
-1. Data coverage & performance FE per kota  
-2. Skill/cert graph + placement PKWT  
-3. Audit trail yang bank percaya (GPS + foto + fraud)  
-4. Integrasi monitoring ↔ ITSM (switching cost)  
-5. Supply marketplace yang sulit ditiru cepat di daerah  
-
-*Visual:* “moat layers” pyramid.
+### Slide 12 — Why We Win (talent)
+**Headline:** Moat = liquidity + trust supply daerah.  
+1. Density FE terverifikasi per kota  
+2. Graph skill/sertifikasi  
+3. Reputasi (leaderboard, fraud, rating)  
+4. Switching cost: history job + wallet  
 
 ---
 
-### Slide 13 — Competitive Landscape
-**Headline:** Kompetitor menyelesaikan sebagian. Kami menyelesaikan rantai penuh.  
-| | Spreadsheet+WA | ITSM generik | Vendor FE tunggal | **FE-Track** |
-|--|----------------|--------------|-------------------|--------------|
-| Dispatch geo+skill | ✗ | △ | △ | ✓ |
-| SLA field + stop-clock | ✗ | △ | △ | ✓ |
-| Trust GPS/foto/fraud | ✗ | ✗ | △ | ✓ |
-| Marketplace Mitra | ✗ | ✗ | ✗ | ✓ |
-| PKWT placement | ✗ | ✗ | △ | ✓ |
+### Slide 13 — Competitor
+**Headline:** Job board umum ≠ field dispatch. Vendor tunggal ≠ marketplace.  
+| | Job board | WA group | Vendor tetap | **FE-Track** |
+|--|-----------|----------|--------------|--------------|
+| Geo + skill match live | ✗ | ✗ | △ | ✓ |
+| Status available realtime | ✗ | ✗ | △ | ✓ |
+| Bukti on-site + bayar | ✗ | ✗ | △ | ✓ |
+| Pool freelance nasional | △ | ✗ | ✗ | ✓ |
 
 ---
 
-### Slide 14 — Product Reality (Traction proxy)
-**Headline:** Platform sudah dibangun end-to-end — siap soft-launch.  
-**Checklist “built” (centang besar):**
-- ✅ Auto-dispatch + L0/L1 handover  
-- ✅ PWA FE offline-aware + check-in 100m  
-- ✅ Wallet Mitra + residual PKWT + payroll isolation  
-- ✅ Anti-fraud + leaderboard Mitra  
-- ✅ Open API / webhook + DLQ  
-- ✅ Kontrak PKWT, placement, cron expire/remind  
-- ✅ Panduan deploy VPS production  
-
-*Visual:* product screenshot collage **dengan caption cerita**, bukan gallery.
-
-**Speaker:** Bedakan jujur: *product built* vs *revenue traction*. Investor menghargai kejujuran.
+### Slide 14 — Product Reality
+**Headline:** Mesin cari & kerahkan orang sudah jalan di produk.  
+✅ Profil FE + skill/cert  
+✅ Auto-dispatch terdekat  
+✅ Accept / re-assign  
+✅ PWA lapangan + check-in  
+✅ Wallet Mitra + recruitment funnel  
+✅ (Enterprise) PKWT placement — bukan inti pitch talent  
 
 ---
 
-### Slide 15 — Go-to-Market
-**Headline:** Beachhead ketat → bukti SLA → ekspansi kota.  
-| Fase | Fokus | Bukti sukses |
-|------|-------|--------------|
-| 0–6 bln | 1–2 pilot Jabodetabek, 50–100 FE | SLA meet target, MTTR turun |
-| 6–18 bln | Tier 2/3 + SDWAN | Coverage heatmap, repeat contract |
-| 18+ bln | Multi-enterprise + portal customer | Category leadership |
-
-*Visual:* peta ekspansi kota (bukan 34 provinsi sekaligus).
+### Slide 15 — GTM (supply + demand)
+**Headline:** Seimbangkan dua sisi — jangan hanya jualan SaaS.  
+| Fase | Demand | Supply |
+|------|--------|--------|
+| 0–6 bln | 1–2 pilot kota padat | 50–100 FE verified |
+| 6–18 bln | Multi-client | Expand kabupaten + sertifikasi |
+| 18+ bln | Enterprise portal | Brand “kerja FE” nasional |
 
 ---
 
 # BAGIAN E — Ask & Close (Slide 16–18)
 
 ### Slide 16 — The Ask
-**Headline:** Kami mencari [Mitra strategis / Seed / Bridge] untuk mendominasi beachhead.  
-**Gunakan dana untuk (pie 100%):**
-- __% Onboarding & sertifikasi FE kota target  
-- __% NOC / ops runway pilot  
-- __% Sales enterprise (bank/MSP)  
-- __% Product (portal customer, capacity planning)  
+**Headline:** Modal untuk mengisi liquidity marketplace.  
+Use of funds (contoh):
+- __% Acquisition & sertifikasi FE  
+- __% Demand sales (pilot client)  
+- __% Ops / NOC ringan untuk trust  
+- __% Product (matching & supply tools)  
 
-**Milestone 12 bulan (max 4):**
-1. ___ tenant aktif  
-2. SLA meet ≥ ___%  
-3. ___ ticket/bulan  
-4. ___ kota covered  
-
-*Visual:* pie use-of-funds + milestone timeline.
+Milestone: FE aktif / kota, fill rate, time-to-accept, ticket volume.
 
 ---
 
 ### Slide 17 — Vision
-**Headline:** Menjadi “Uber + ServiceNow” untuk field ops retail Indonesia.  
-Satu baris close:  
-> *Setiap toko down punya engineer tepat, bukti kuat, dan SLA yang bisa dijual ke board.*
-
-*Visual:* future state — heatmap nasional hijau.
+**Headline:** Menjadi “Gojek-nya teknisi lapangan” untuk retail & payment Indonesia.  
+Setiap toko butuh orang → dalam menit, sistem menemukan freelance yang tepat.
 
 ---
 
-### Slide 18 — Closing / Contact
-**FE-Track**  
-[Nama] · [Role] · [Email] · [WhatsApp]  
-Demo: [link staging] · Deck: confidential  
+### Slide 18 — Close
+**Headline:** Bantu kami mengisi 1 kota penuh FE. Demand akan mengikuti liquidity.  
+Kontak · demo · deck confidential  
 
-**Appendix marker:** “Backup slides tersedia.”
-
----
-
-# APPENDIX (siap jika ditanya)
-
-| A1 | Detail legal Mitra vs PKWT (compliance) |
-| A2 | Alur anti-fraud & hold komisi |
-| A3 | Arsitektur teknis (Next.js, PostGIS, PWA) |
-| A4 | Pricing skeleton & contoh ServicePackage |
-| A5 | Risk register (coverage daerah, fraud, gateway WA) |
-| A6 | Team & hiring plan |
-| A7 | Financial model 36 bulan (jika ada) |
+**Kalimat tutup:**  
+> “Yang kami jual bukan dashboard. Yang kami jual: orang yang bisa datang memperbaiki.”
 
 ---
 
-## Tips presentasi ke CEO vs Investor
+## APPENDIX
 
-| Audiens | Tekankan | Kurangi |
-|---------|----------|---------|
-| **CEO (customer/partner)** | SLA, risiko operasional, audit bank, time-to-fix | Cap table, dilusi |
-| **Investor** | Market, unit economics, moat, use of funds, beachhead | Fitur UI bertele-tele |
-
-**Kalimat pembuka yang kuat (pilih satu):**
-1. “Kami menjual kepastian SLA — bukan software ticket.”  
-2. “WhatsApp tidak bisa di-audit. Field ops bank harus bisa.”  
-3. “Supply FE di daerah ada. Yang belum ada adalah sistem operasi.”  
-
-**Kalimat penutup:**
-> “Bantu kami men-soft-launch 1 kota. Angka SLA akan berbicara sendiri.”
+| A1 | Legal Mitra (kemitraan) vs PKWT |
+| A2 | Cara screening & sertifikasi FE |
+| A3 | Anti-fraud agar buyer percaya freelance |
+| A4 | Pricing fee FE vs customer |
+| A5 | Playbook recruit SMK per kota |
 
 ---
 
-## Checklist sebelum naik panggung
+## Tips presentasi (penting)
 
-- [ ] Isi angka slide 2, 9, 11, 16 (jangan kosong / “TBD” besar)  
-- [ ] 1 demo cerita ticket (60 detik) sudah dilatih  
-- [ ] 1 screenshot War Room + 1 screenshot FE check-in  
-- [ ] Jawaban siap: “Siapa kompetitor?” “Cara bayar FE?” “Legal Mitra?”  
-- [ ] Backup slide legal & fraud  
-- [ ] Durasi latihan ≤ 15 menit  
+| Jangan buka dengan… | Buka dengan… |
+|---------------------|--------------|
+| Fitur SLA / War Room | “Dari mana dapat FE freelance hari ini?” |
+| Arsitektur software | Peta shortage vs available |
+| Mitra vs PKWT detail | Cerita 1 job terisi dalam 15 menit |
+
+**Untuk CEO buyer:** time-to-fill, risiko orang salah, audit.  
+**Untuk investor:** liquidity dua sisi, take-rate, density kota, network effect.
 
 ---
 
-## Referensi internal
+## Referensi
 
 - [BUSINESS_PLAN.md](./BUSINESS_PLAN.md)  
-- [ENGAGEMENT.md](./ENGAGEMENT.md)  
+- [ENGAGEMENT.md](./ENGAGEMENT.md) — Mitra = inti freelance  
 - [LEGAL_COMPLIANCE.md](../LEGAL_COMPLIANCE.md)  
-- [USER_GUIDE.md](./USER_GUIDE.md)  
-- [DEPLOYMENT_VPS.md](./DEPLOYMENT_VPS.md)  
