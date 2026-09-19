@@ -51,7 +51,8 @@ const STOP = new Set([
 export function tokenize(q: string): string[] {
   return q
     .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s+-]/gu, " ")
+    // Latin + angka (hindari \p{L} — butuh target ES2018+; VPS build ketat)
+    .replace(/[^a-z0-9\s+-]+/g, " ")
     .split(/\s+/)
     .map((t) => t.trim())
     .filter((t) => t.length >= 2 && !STOP.has(t));
