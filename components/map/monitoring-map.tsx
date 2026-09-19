@@ -236,8 +236,6 @@ export function MonitoringMap() {
       style: DEFAULT_MAP_STYLE,
       center: DEFAULT_MAP_CENTER,
       zoom: 10,
-      // Mobile Safari: jangan gagal karena "performance caveat"
-      failIfMajorPerformanceCaveat: false,
     });
 
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
