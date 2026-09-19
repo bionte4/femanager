@@ -89,10 +89,12 @@ sudo apt install -y nginx certbot python3-certbot-nginx
 
 ## 4. Clone & environment
 
+App di **`/opt/fetrack`** (standar binary/service di Linux; backup tetap di `/var/backups`).
+
 ```bash
-sudo mkdir -p /var/www
-sudo chown $USER:$USER /var/www
-cd /var/www
+sudo mkdir -p /opt/fetrack
+sudo chown $USER:$USER /opt/fetrack
+cd /opt
 git clone https://github.com/bionte4/femanager.git fetrack
 cd fetrack
 ```
@@ -188,7 +190,7 @@ docker compose -f docker-compose.prod.yml ps
 ## 6. Install app, migrate, build
 
 ```bash
-cd /var/www/fetrack
+cd /opt/fetrack
 npm ci
 npx prisma generate
 npx prisma migrate deploy
@@ -213,7 +215,7 @@ Buat user admin production lewat Prisma Studio / SQL / script — **ganti passwo
 ## 7. Jalankan dengan PM2
 
 ```bash
-cd /var/www/fetrack
+cd /opt/fetrack
 pm2 start npm --name fetrack -- start
 pm2 save
 pm2 startup
@@ -237,7 +239,7 @@ module.exports = {
   apps: [
     {
       name: "fetrack",
-      cwd: "/var/www/fetrack",
+      cwd: "/opt/fetrack",
       script: "node_modules/next/dist/bin/next",
       args: "start -p 3000",
       instances: 1,
@@ -345,7 +347,7 @@ mkdir -p "$DIR"
 docker exec fetrack-postgres pg_dump -U postgres -d fetrack -Fc \
   > "$DIR/fetrack_$STAMP.dump"
 # Upload lokal (persist foto)
-tar -czf "$DIR/uploads_$STAMP.tgz" -C /var/www/fetrack/public uploads
+tar -czf "$DIR/uploads_$STAMP.tgz" -C /opt/fetrack/public uploads
 # Retensi 14 hari
 find "$DIR" -type f -mtime +14 -delete
 ```
@@ -367,7 +369,7 @@ docker exec -i fetrack-postgres pg_restore -U postgres -d fetrack --clean --if-e
 ## 11. Update / redeploy
 
 ```bash
-cd /var/www/fetrack
+cd /opt/fetrack
 git pull origin main
 npm ci
 npx prisma generate

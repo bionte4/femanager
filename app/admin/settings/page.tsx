@@ -17,7 +17,7 @@ export default async function SettingsPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button asChild variant="outline">
-            <Link href="/admin/settings/integrations">WA / Email / AI →</Link>
+            <Link href="/admin/integrations#channels">WA / Email / AI →</Link>
           </Button>
           <Button asChild variant="outline">
             <Link href="/admin/settings/commissions">Commission Rules →</Link>

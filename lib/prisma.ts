@@ -5,8 +5,8 @@ const globalForPrisma = globalThis as unknown as {
   prismaClientRev?: number;
 };
 
-/** Naikkan angka ini setelah migrate field/model baru agar HMR buang client lama */
-const PRISMA_CLIENT_REV = 3;
+/** Naikkan setelah migrate model baru agar HMR buang client lama (harus restart `next` juga setelah `prisma generate`) */
+const PRISMA_CLIENT_REV = 5;
 
 function createPrismaClient() {
   // Jangan log setiap query di dev — spam I/O bikin terasa hang saat compile
@@ -20,25 +20,41 @@ function createPrismaClient() {
   });
 }
 
+function hasDelegate(
+  client: PrismaClient,
+  name: string
+): boolean {
+  const c = client as unknown as Record<string, { findMany?: unknown }>;
+  return typeof c[name]?.findMany === "function";
+}
+
 function isStaleClient(client: PrismaClient): boolean {
   // Setelah migrate model baru, HMR bisa pakai PrismaClient lama tanpa delegate
-  const c = client as unknown as Record<string, { findMany?: unknown }>;
   return (
-    typeof c.serviceCategory?.findMany !== "function" ||
-    typeof c.appNotification?.findMany !== "function" ||
-    typeof c.webhookDeadLetter?.findMany !== "function" ||
-    typeof c.pushDeviceToken?.findMany !== "function" ||
-    typeof c.sparepartMutation?.findMany !== "function" ||
-    typeof c.engineerContract?.findMany !== "function" ||
-    typeof c.engagementChangeLog?.findMany !== "function"
+    !hasDelegate(client, "serviceCategory") ||
+    !hasDelegate(client, "appNotification") ||
+    !hasDelegate(client, "webhookDeadLetter") ||
+    !hasDelegate(client, "pushDeviceToken") ||
+    !hasDelegate(client, "sparepartMutation") ||
+    !hasDelegate(client, "engineerContract") ||
+    !hasDelegate(client, "engagementChangeLog") ||
+    !hasDelegate(client, "appSetting")
   );
 }
 
 const existing = globalForPrisma.prisma;
 const revOk = globalForPrisma.prismaClientRev === PRISMA_CLIENT_REV;
+
+if (existing && (!revOk || isStaleClient(existing))) {
+  void existing.$disconnect().catch(() => undefined);
+  globalForPrisma.prisma = undefined;
+}
+
 export const prisma =
-  existing && revOk && !isStaleClient(existing)
-    ? existing
+  globalForPrisma.prisma &&
+  globalForPrisma.prismaClientRev === PRISMA_CLIENT_REV &&
+  !isStaleClient(globalForPrisma.prisma)
+    ? globalForPrisma.prisma
     : createPrismaClient();
 
 if (process.env.NODE_ENV !== "production") {

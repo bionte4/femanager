@@ -127,6 +127,7 @@ export async function saveWhatsappSettingsAction(
       token: mergeSecret(parsed.token, current.token, parsed.clear_token),
     };
     await setSettingJson(SETTING_KEYS.whatsapp, next, session.user.id);
+    revalidatePath("/admin/integrations");
     revalidatePath("/admin/settings/integrations");
     return { success: true };
   } catch (e) {
@@ -172,6 +173,7 @@ export async function saveSmtpSettingsAction(
       from_name: (parsed.from_name ?? "FE-Track").trim() || "FE-Track",
     };
     await setSettingJson(SETTING_KEYS.smtp, next, session.user.id);
+    revalidatePath("/admin/integrations");
     revalidatePath("/admin/settings/integrations");
     return { success: true };
   } catch (e) {
@@ -212,6 +214,7 @@ export async function saveAiSettingsAction(
       api_key: apiKey,
     };
     await setSettingJson(SETTING_KEYS.ai, next, session.user.id);
+    revalidatePath("/admin/integrations");
     revalidatePath("/admin/settings/integrations");
     return { success: true };
   } catch (e) {
