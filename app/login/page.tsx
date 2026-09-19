@@ -6,7 +6,7 @@ import { LoginForm } from "@/components/auth/login-form";
 export const metadata = {
   title: "Login | FE-Track",
   description:
-    "Platform penugasan field engineer untuk menjaga SLA toko se-Indonesia",
+    "Platform penugasan field engineer untuk pemenuhan SLA se-Indonesia",
 };
 
 export default async function LoginPage() {
@@ -46,8 +46,7 @@ export default async function LoginPage() {
               FE-Track
             </p>
             <p className="mt-3 max-w-sm text-base leading-relaxed text-emerald-100/70">
-              Platform penugasan field engineer. Menjaga SLA toko se-Indonesia
-              tetap terpenuhi.
+              Platform penugasan field engineer untuk pemenuhan SLA se-Indonesia.
             </p>
           </div>
 
