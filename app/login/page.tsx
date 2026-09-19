@@ -21,8 +21,7 @@ export default async function LoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen flex-col overflow-hidden bg-[#0b1f1a]">
-      {/* Atmosphere */}
+    <div className="relative flex h-dvh max-h-dvh flex-col overflow-hidden bg-[#0b1f1a]">
       <div
         className="pointer-events-none absolute inset-0 opacity-90"
         style={{
@@ -38,38 +37,29 @@ export default async function LoginPage() {
         }}
       />
 
-      <div className="relative z-10 flex flex-1 flex-col justify-center px-5 py-10 sm:px-8">
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col justify-center px-5 py-4 sm:px-8 sm:py-6">
         <div className="mx-auto w-full max-w-md">
-          {/* Brand hero */}
-          <div className="mb-10 animate-in fade-in slide-in-from-bottom-3 duration-700">
-            <p className="font-[family-name:var(--font-display)] text-5xl font-bold tracking-tight text-white sm:text-6xl">
+          <div className="mb-4 animate-in fade-in slide-in-from-bottom-3 duration-500 sm:mb-5">
+            <p className="font-[family-name:var(--font-display)] text-4xl font-bold tracking-tight text-white sm:text-5xl">
               FE-Track
             </p>
-            <p className="mt-3 max-w-sm text-base leading-relaxed text-emerald-100/70">
+            <p className="mt-1.5 max-w-sm text-sm leading-snug text-emerald-100/70 sm:text-[15px]">
               Platform penugasan field engineer untuk pemenuhan SLA se-Indonesia.
             </p>
           </div>
 
-          <div className="animate-in fade-in slide-in-from-bottom-4 rounded-2xl border border-white/10 bg-white/95 p-6 shadow-2xl shadow-black/30 duration-700 delay-100 sm:p-8">
-            <div className="mb-6">
-              <h1 className="text-xl font-semibold text-foreground">Masuk</h1>
-              <p className="mt-1 text-sm text-muted-foreground">
+          <div className="animate-in fade-in slide-in-from-bottom-4 rounded-2xl border border-white/10 bg-white/95 p-4 shadow-2xl shadow-black/30 duration-500 sm:p-6">
+            <div className="mb-4">
+              <h1 className="text-lg font-semibold text-foreground">Masuk</h1>
+              <p className="mt-0.5 text-sm text-muted-foreground">
                 Pakai nomor HP & password akun kamu
               </p>
             </div>
 
             <LoginForm />
-
-            <p className="mt-6 text-center text-xs text-muted-foreground">
-              Demo: seed ops di VPS · Lupa password? Hubungi admin / Edit Engineer.
-            </p>
           </div>
         </div>
       </div>
-
-      <footer className="relative z-10 pb-6 text-center text-xs text-emerald-100/40">
-        Field Engineer Dispatch & SLA Platform
-      </footer>
     </div>
   );
 }

@@ -45,8 +45,8 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-5">
-      <div className="space-y-2">
+    <form onSubmit={onSubmit} className="space-y-3.5">
+      <div className="space-y-1.5">
         <Label htmlFor="phone">Nomor HP</Label>
         <div className="relative">
           <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -64,7 +64,7 @@ export function LoginForm() {
         </div>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         <Label htmlFor="password">Password</Label>
         <div className="relative">
           <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -120,7 +120,7 @@ export function LoginForm() {
         >
           Lupa password?
         </Link>{" "}
-        Reset via OTP WhatsApp, atau minta admin reset di menu Engineers.
+        Reset via OTP WhatsApp / Telegram.
       </p>
     </form>
   );
