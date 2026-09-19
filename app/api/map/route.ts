@@ -3,6 +3,9 @@ import { DeviceStatus, Role, TicketStatus } from "@prisma/client";
 import { auth, ADMIN_ROLES } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+/** Pakai session/headers — jangan di-prerender saat `next build` */
+export const dynamic = "force-dynamic";
+
 const ACTIVE_TICKET_STATUSES: TicketStatus[] = [
   TicketStatus.OPEN,
   TicketStatus.ASSIGNED,
