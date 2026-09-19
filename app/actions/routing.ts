@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { Prisma, TicketStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { auth, ADMIN_ROLES, NOC_L0_ROLES, NOC_L1_ROLES } from "@/lib/auth";
+import { NOC_L0_ROLES, NOC_L1_ROLES } from "@/lib/auth";
 import { requireAppAdmin } from "@/lib/rbac";
 import { notifyEscalateL1 } from "@/lib/notifications";
 import { ticketListInclude } from "@/lib/tickets/service";

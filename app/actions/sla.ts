@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { auth, ADMIN_ROLES } from "@/lib/auth";
 import { requireAppAdmin } from "@/lib/rbac";
 import { slaConfigSchema, type SlaConfigInput } from "@/lib/validations/master";
 

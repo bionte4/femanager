@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { auth, ADMIN_ROLES } from "@/lib/auth";
 import { tenantSchema, type TenantInput } from "@/lib/validations/master";
 import {
   EXCEL_IMPORT_MAX_ROWS,

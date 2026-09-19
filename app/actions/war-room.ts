@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { auth, ADMIN_ROLES } from "@/lib/auth";
 import { requireAppAdmin } from "@/lib/rbac";
 import {
   listWebhookDeadLetters,

@@ -9,7 +9,7 @@ import {
   PartnershipStatus,
   Prisma,
 } from "@prisma/client";
-import { auth, ADMIN_ROLES } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 import { requireAppAdmin } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import {

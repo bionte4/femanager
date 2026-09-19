@@ -7,7 +7,6 @@ import {
   Role,
   TicketStatus,
 } from "@prisma/client";
-import { auth, ADMIN_ROLES } from "@/lib/auth";
 import { requireMasterAdmin } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 

@@ -4,7 +4,6 @@ import {
   ADMIN_PATH_ROLE_RULES,
   rolesForAdminPath,
   MASTER_ROLES,
-  PAYROLL_ROLES,
   SYSTEM_ROLES,
   USERS_ADMIN_ROLES,
   hasRole,

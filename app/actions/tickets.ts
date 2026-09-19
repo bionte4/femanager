@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { Prisma, Role, TicketStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { auth, ADMIN_ROLES } from "@/lib/auth";
+import { ADMIN_ROLES } from "@/lib/auth";
 import { requireAppAdmin } from "@/lib/rbac";
 import { requireActiveSession } from "@/lib/session-guard";
 import {
