@@ -341,4 +341,190 @@ L0 wajib coba remote/triage:
 Isi handover: gejala, last ping, aksi remote[]. Jangan escalate "gelap" tanpa data.
 `,
   },
+
+  // ─── DESKTOP / LAPTOP ──────────────────────────────────
+  {
+    title: "Troubleshoot PC Kasir / Desktop — Hang / Tidak Nyala",
+    category: "DESKTOP",
+    content: `# PC / Desktop Kasir
+
+## Tidak nyala
+1. Cek power strip & kabel power.
+2. Coba colokan lain; dengarkan fan/beep.
+3. Lepas peripheral USB non-penting; coba nyala lagi.
+4. Jika PSU/motherboard curiga → jangan bongkar dalam tanpa spare; escalate gudang.
+
+## Hang / lambat
+1. Task Manager: CPU/RAM/Disk 100%?
+2. Restart bersih; cek disk space.
+3. Update antivirus/signature hanya jika policy customer izinkan.
+4. Jangan install software pirate / remote tool liar.
+
+## Closing
+Foto error / Device Manager + notes gejala → aksi → hasil.
+`,
+  },
+  {
+    title: "Troubleshoot Laptop Staff — Charger / Overheat",
+    category: "LAPTOP",
+    content: `# Laptop Field / Staff
+
+1. Charger original? Tegangan & LED charging.
+2. Battery health: jika bengkak → stop pakai, serahkan gudang.
+3. Overheat: bersihkan ventilasi (kering); elevasi laptop.
+4. Keyboard/port rusak: catat SN + foto; ajukan replace.
+5. Jangan buka casing seal vendor tanpa instruksi.
+
+Test: boot Windows/Linux, WiFi, USB, tampilan.
+`,
+  },
+
+  // ─── EDC tambahan ──────────────────────────────────────
+  {
+    title: "SOP Ganti SIM EDC — Hanya dengan Instruksi NOC",
+    category: "EDC",
+    content: `# Ganti SIM EDC
+
+## Larangan
+- **Jangan** ganti SIM atas inisiatif sendiri.
+- **Jangan** pinjam SIM merchant / prepaid sembarangan.
+
+## Jika NOC/Helpdesk instruksikan
+1. Foto slot SIM sebelum & sesudah.
+2. Catat ICCID / nomor jika terlihat.
+3. Restart terminal; tunggu register jaringan.
+4. Test koneksi + transaksi; foto hasil.
+5. Update notes ticket + nomor instruksi NOC.
+`,
+  },
+  {
+    title: "Troubleshoot EDC — Kartu Tidak Terbaca / Chip Error",
+    category: "EDC",
+    content: `# Chip / Magstripe Error
+
+1. Bersihkan reader dengan kartu cleaner / kain kering (jangan cairan sembarangan).
+2. Coba kartu lain (jika PIC izinkan) — bedakan kartu rusak vs terminal.
+3. Cek firmware/error code di layar; foto.
+4. Restart terminal.
+5. Jika berulang di banyak kartu → replace unit / escalate.
+`,
+  },
+
+  // ─── SDWAN / NETWORK tambahan ──────────────────────────
+  {
+    title: "SOP Labeling Rack & Dokumentasi Patch Panel",
+    category: "SDWAN",
+    content: `# Label & Kerapihan Rack
+
+1. Label port WAN1/WAN2/LAN sesuai diagram work order.
+2. Ikat kabel rapi; jangan blokir airflow.
+3. Update foto rack after + denah sederhana di notes.
+4. Serahkan sisa kabel/dus ke PIC atau bawa sesuai policy.
+5. Jangan cabut kabel bertanda "JANGAN CABUT" tanpa konfirmasi.
+`,
+  },
+  {
+    title: "Troubleshoot Switch Toko — Port Mati / Loop",
+    category: "LAN",
+    content: `# Switch / Switching
+
+1. Cek power & fan switch.
+2. LED port: link/activity — cabut-pasang patch cord.
+3. Coba port lain & kabel baru.
+4. Indikasi loop: broadcast storm (LED semua kedip cepat) → cabut uplink satu per satu dengan hati-hati + koordinasi NOC.
+5. Jangan enable port mirror / ubah VLAN tanpa instruksi.
+`,
+  },
+
+  // ─── OPERASIONAL APP ───────────────────────────────────
+  {
+    title: "SOP Check-in GPS & Radius 100m",
+    category: "GENERAL",
+    content: `# Check-in di FE-Track
+
+1. Aktifkan GPS akurat di HP.
+2. Hanya check-in dalam **±100m** dari koordinat tenant.
+3. Jika ditolak: pindah ke titik toko, tunggu GPS lock, coba lagi.
+4. Jangan spoof lokasi — terdeteksi fraud & penalti trust.
+5. Lanjut status: ON_SITE → kerjakan → foto before/after.
+`,
+  },
+  {
+    title: "SOP Stop Clock SLA — Kapan Boleh Pause",
+    category: "GENERAL",
+    content: `# Stop Clock
+
+Pause SLA hanya jika alasan sah, contoh:
+- Tunggu sparepart / approval bank
+- Akses lokasi ditutup merchant
+- Force majeure (bencana)
+
+1. Ajukan stop clock di app + alasan jelas.
+2. Lanjut kerja segera saat hambatan selesai — jangan lupa **resume**.
+3. Abuse stop clock = temuan compliance.
+`,
+  },
+  {
+    title: "Mitra vs PKWT — Aturan Ambil / Tolak Job",
+    category: "GENERAL",
+    content: `# Engagement
+
+## Mitra
+- Boleh terima/tolak job sesuai app (tolak berulang turunkan trust).
+- Wajib perjanjian kemitraan signed.
+- Komisi via wallet.
+
+## PKWT
+- Tugas penempatan — **tidak boleh tolak** job di pool kontrak.
+- Berhalangan: hubungi supervisor/NOC.
+- Payroll HR, bukan withdraw Mitra.
+`,
+  },
+  {
+    title: "SOP Mutasi Sparepart di Ticket",
+    category: "GENERAL",
+    content: `# Sparepart
+
+1. Ambil part dari stock engineer/gudang sesuai SKU.
+2. Catat mutasi OUT terkait ticket + SN part.
+3. Part rusak (RMA): foto + SN, status return sesuai gudang.
+4. Jangan pakai part tanpa mutasi — audit stock akan mismatch.
+`,
+  },
+  {
+    title: "SOP Komunikasi ke Merchant & PIC",
+    category: "GENERAL",
+    content: `# Komunikasi
+
+1. Perkenalkan diri + tunjukkan ID/ticket.
+2. Jelaskan gejala & estimasi waktu singkat.
+3. Minta izin sebelum cabut kabel / matikan listrik lokal.
+4. Setelah selesai: edukasi singkat + minta konfirmasi PIC.
+5. Jangan janji SLA di luar wewenang — arahkan ke NOC/CS.
+`,
+  },
+  {
+    title: "Troubleshoot WiFi — Captive Portal / Login Guest Gagal",
+    category: "WIFI",
+    content: `# Captive Portal
+
+1. Lupa password SSID: jangan broadcast password di chat publik.
+2. Clear cache browser / forget network di HP uji.
+3. Cek DHCP pool penuh.
+4. Voucher/expired guest: koordinasi admin WiFi customer.
+5. Pastikan VLAN guest terpisah dari kasir.
+`,
+  },
+  {
+    title: "Troubleshoot CCTV — Recording Gap / HDD Error",
+    category: "CCTV",
+    content: `# Recording Bermasalah
+
+1. Cek status HDD di NVR (smart/error/full).
+2. Pastikan schedule recording aktif per channel.
+3. Jangan format HDD tanpa approval tertulis customer.
+4. Ganti HDD: catat SN lama/baru + foto.
+5. Verifikasi playback 15 menit terakhir setelah perbaikan.
+`,
+  },
 ];
