@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Loader2, Phone, Lock, Eye, EyeOff } from "lucide-react";
@@ -113,8 +114,13 @@ export function LoginForm() {
       </Button>
 
       <p className="text-center text-xs text-muted-foreground">
-        Lupa password? Hubungi admin NOC untuk di-reset, atau admin bisa reset
-        lewat menu Engineers → Edit (isi password baru).
+        <Link
+          href="/forgot-password"
+          className="font-medium text-emerald-700 underline-offset-2 hover:underline"
+        >
+          Lupa password?
+        </Link>{" "}
+        Reset via OTP WhatsApp, atau minta admin reset di menu Engineers.
       </p>
     </form>
   );

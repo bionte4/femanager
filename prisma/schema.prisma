@@ -898,3 +898,17 @@ model AppSetting {
 
   @@map("app_settings")
 }
+
+/// OTP lupa password via WhatsApp
+model PasswordResetOtp {
+  id          String    @id @default(cuid())
+  phone       String
+  code_hash   String
+  expires_at  DateTime
+  attempts    Int       @default(0)
+  consumed_at DateTime?
+  created_at  DateTime  @default(now())
+
+  @@index([phone, created_at])
+  @@map("password_reset_otps")
+}

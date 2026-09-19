@@ -241,16 +241,15 @@ SEED_PASSWORD='DemoShow2026!' npx tsx scripts/seed-demo-ops.ts
 
 ### Reset password
 
-Self-service email/OTP **belum** ada. Cara yang tersedia:
-
-1. **Admin UI** — Engineers → Edit → isi **Reset password** → Simpan  
-2. **CLI VPS**:
+1. **Self-service OTP WhatsApp** — `/forgot-password` (butuh Fonnte aktif di Integrations)
+2. **Admin UI** — Engineers → Edit → Reset password
+3. **CLI**:
 ```bash
 RESET_PHONE='081222222001' RESET_PASS='PasswordBaru123' \
   npx tsx scripts/reset-password.ts
 ```
 
-Login: `https://klikhadir.site/login` → phone + password.
+OTP: 6 digit, berlaku 10 menit, max 3 kirim/jam per nomor.
 
 ---
 

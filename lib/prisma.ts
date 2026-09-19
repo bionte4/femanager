@@ -6,7 +6,7 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 /** Naikkan setelah migrate model baru agar HMR buang client lama (harus restart `next` juga setelah `prisma generate`) */
-const PRISMA_CLIENT_REV = 5;
+const PRISMA_CLIENT_REV = 6;
 
 function createPrismaClient() {
   // Jangan log setiap query di dev — spam I/O bikin terasa hang saat compile
@@ -38,7 +38,8 @@ function isStaleClient(client: PrismaClient): boolean {
     !hasDelegate(client, "sparepartMutation") ||
     !hasDelegate(client, "engineerContract") ||
     !hasDelegate(client, "engagementChangeLog") ||
-    !hasDelegate(client, "appSetting")
+    !hasDelegate(client, "appSetting") ||
+    !hasDelegate(client, "passwordResetOtp")
   );
 }
 
