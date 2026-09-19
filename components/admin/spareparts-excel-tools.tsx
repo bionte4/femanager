@@ -135,6 +135,15 @@ export function SparepartsExcelTools() {
           variant="outline"
           size="sm"
           className="h-8"
+          onClick={handleDownloadTemplate}
+        >
+          <FileSpreadsheet className="h-3.5 w-3.5" />
+          Unduh Template
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8"
           disabled={exporting}
           onClick={handleExport}
         >
