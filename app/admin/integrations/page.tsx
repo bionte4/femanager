@@ -27,7 +27,8 @@ export default async function AdminIntegrationsPage() {
           <div>
             <h1 className="text-xl font-semibold tracking-tight">Integrations</h1>
             <p className="text-xs text-muted-foreground">
-              Channel runtime (WA / Email / AI) — override .env tanpa redeploy.
+              Channel runtime (WA / Email / AI / Workload Guard) — override .env
+              tanpa redeploy.
             </p>
           </div>
           <IntegrationsSettingsClient initial={channelSettings} />

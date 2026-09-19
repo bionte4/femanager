@@ -90,7 +90,7 @@ export async function getTicketById(id: string) {
 
 export async function getAssignableEngineers() {
   await requireAdmin();
-  return prisma.user.findMany({
+  const engineers = await prisma.user.findMany({
     where: { role: Role.FIELD_ENGINEER },
     select: {
       id: true,
@@ -101,6 +101,20 @@ export async function getAssignableEngineers() {
       skills: true,
     },
     orderBy: [{ status: "asc" }, { full_name: "asc" }],
+  });
+
+  const { getEngineersWorkload } = await import("@/lib/workload-guard");
+  const workloads = await getEngineersWorkload(engineers.map((e) => e.id));
+
+  return engineers.map((e) => {
+    const w = workloads.get(e.id);
+    return {
+      ...e,
+      active_count: w?.active_count ?? 0,
+      load_minutes: w?.load_minutes ?? 0,
+      workload_blocked: w?.blocked ?? false,
+      workload_warned: w?.warned ?? false,
+    };
   });
 }
 
@@ -306,6 +320,12 @@ export async function updateTicketStatusAction(
         },
       });
     });
+
+    void import("@/lib/time-tracker").then(({ recomputeTicketTimeSummary }) =>
+      recomputeTicketTimeSummary(ticket.id).catch((e) =>
+        console.error("[time-tracker]", e)
+      )
+    );
 
     // Push status ke customer ITSM jika ticket dari Open API
     void import("@/lib/webhook").then(({ triggerExternalWebhook }) =>
@@ -838,6 +858,20 @@ export async function assignEngineerAction(
       return { success: false, error: eligibility.error };
     }
 
+    const {
+      assertEngineerCanTakeTicket,
+      estimateTicketLoadMinutes,
+    } = await import("@/lib/workload-guard");
+    const extraLoad = await estimateTicketLoadMinutes(ticket.id);
+    const workload = await assertEngineerCanTakeTicket(engineer.id, {
+      excludeTicketId: ticket.id,
+      extraLoadMinutes: extraLoad,
+      override: parsed.override_workload === true,
+    });
+    if (!workload.ok) {
+      return { success: false, error: workload.error };
+    }
+
     const now = new Date();
     const tried = Array.from(
       new Set([...ticket.tried_engineer_ids, engineer.id])
@@ -912,6 +946,12 @@ export async function assignEngineerAction(
 
     void import("@/lib/webhook").then(({ triggerExternalWebhook }) =>
       triggerExternalWebhook(ticket.id, TicketStatus.ASSIGNED)
+    );
+
+    void import("@/lib/time-tracker").then(({ recomputeTicketTimeSummary }) =>
+      recomputeTicketTimeSummary(ticket.id).catch((e) =>
+        console.error("[time-tracker]", e)
+      )
     );
 
     revalidatePath("/admin/tickets");

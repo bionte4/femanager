@@ -366,6 +366,7 @@ model Ticket {
   rating             EngineerRating?
   fraud_logs         FraudLog[]
   sparepart_mutations SparepartMutation[]
+  time_summary       TicketTimeSummary?
 
   @@index([status])
   @@index([assigned_engineer_id])
@@ -398,6 +399,25 @@ model TicketLog {
   @@index([ticket_id])
   @@index([photo_hash])
   @@map("ticket_logs")
+}
+
+/// Ringkasan Time Tracker per ticket (diisi ulang tiap perubahan status)
+model TicketTimeSummary {
+  ticket_id    String   @id
+  engineer_id  String?
+  queue_ms     Int      @default(0)
+  travel_ms    Int      @default(0)
+  onsite_ms    Int      @default(0)
+  repair_ms    Int      @default(0)
+  pause_ms     Int      @default(0)
+  active_ms    Int      @default(0)
+  total_ms     Int      @default(0)
+  computed_at  DateTime @default(now())
+
+  ticket Ticket @relation(fields: [ticket_id], references: [id], onDelete: Cascade)
+
+  @@index([engineer_id])
+  @@map("ticket_time_summaries")
 }
 
 model Sparepart {

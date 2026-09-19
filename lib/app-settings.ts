@@ -6,6 +6,7 @@ export const SETTING_KEYS = {
   telegram: "integrations.telegram",
   smtp: "integrations.smtp",
   ai: "integrations.ai",
+  workload: "ops.workload",
 } as const;
 
 export type WhatsappSettings = {
@@ -41,6 +42,17 @@ export type AiSettings = {
   model: string;
 };
 
+/** Workload Guard — batas beban FE (disimpan di AppSetting ops.workload) */
+export type WorkloadSettings = {
+  enabled: boolean;
+  /** Max ticket aktif per engineer (hard) */
+  max_active_tickets: number;
+  /** Max total estimasi menit ticket aktif (hard) */
+  max_load_minutes: number;
+  /** Ambang peringatan (soft) */
+  warn_load_minutes: number;
+};
+
 export const DEFAULT_WHATSAPP: WhatsappSettings = {
   enabled: true,
   provider: "fonnte",
@@ -71,6 +83,13 @@ export const DEFAULT_AI: AiSettings = {
   api_key: "",
   base_url: "https://api.openai.com/v1",
   model: "gpt-4o-mini",
+};
+
+export const DEFAULT_WORKLOAD: WorkloadSettings = {
+  enabled: true,
+  max_active_tickets: 2,
+  max_load_minutes: 240,
+  warn_load_minutes: 180,
 };
 
 function asObject(value: unknown): Record<string, unknown> {
@@ -155,6 +174,48 @@ export async function getAiSettings(): Promise<AiSettings> {
     api_key: apiKey,
     base_url: String(raw.base_url ?? "") || envBase,
     model: String(raw.model ?? "") || envModel,
+  };
+}
+
+function clampSetting(
+  n: unknown,
+  min: number,
+  max: number,
+  fallback: number
+): number {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(v)));
+}
+
+export async function getWorkloadSettings(): Promise<WorkloadSettings> {
+  const raw = asObject(await getSettingJson(SETTING_KEYS.workload));
+  const maxActive = clampSetting(
+    raw.max_active_tickets,
+    1,
+    20,
+    DEFAULT_WORKLOAD.max_active_tickets
+  );
+  const maxLoad = clampSetting(
+    raw.max_load_minutes,
+    30,
+    24 * 60,
+    DEFAULT_WORKLOAD.max_load_minutes
+  );
+  let warnLoad = clampSetting(
+    raw.warn_load_minutes,
+    15,
+    24 * 60,
+    DEFAULT_WORKLOAD.warn_load_minutes
+  );
+  if (warnLoad > maxLoad) warnLoad = maxLoad;
+
+  return {
+    enabled:
+      raw.enabled === undefined ? DEFAULT_WORKLOAD.enabled : !!raw.enabled,
+    max_active_tickets: maxActive,
+    max_load_minutes: maxLoad,
+    warn_load_minutes: warnLoad,
   };
 }
 

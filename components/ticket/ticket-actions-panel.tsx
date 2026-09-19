@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 
 type EngineerOption = {
   id: string;
@@ -36,6 +37,10 @@ type EngineerOption = {
   status: string;
   city: string | null;
   skills: string[];
+  active_count?: number;
+  load_minutes?: number;
+  workload_blocked?: boolean;
+  workload_warned?: boolean;
 };
 
 const STATUS_FLOW: TicketStatus[] = [
@@ -94,6 +99,7 @@ export function TicketActionsPanel({
   >(null);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
+  const [overrideWorkload, setOverrideWorkload] = useState(false);
 
   const isPaused = !!slaPausedAt;
   const pendingApproval = stopClockApprovalStatus === "PENDING";
@@ -142,6 +148,7 @@ export function TicketActionsPanel({
       ticket_id: ticketId,
       engineer_id: engineerId,
       notes: notes || null,
+      override_workload: overrideWorkload || undefined,
     });
     setLoading(null);
     if (!result.success) {
@@ -422,11 +429,23 @@ export function TicketActionsPanel({
                   <SelectItem key={e.id} value={e.id}>
                     {e.full_name} · {e.status}
                     {e.city ? ` · ${e.city}` : ""}
-                    {e.skills?.length ? ` · ${e.skills.join("/")}` : ""}
+                    {` · ${e.active_count ?? 0} aktif / ${e.load_minutes ?? 0}m`}
+                    {e.workload_blocked
+                      ? " · OVERLOAD"
+                      : e.workload_warned
+                        ? " · WARN"
+                        : ""}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Checkbox
+                checked={overrideWorkload}
+                onCheckedChange={(v) => setOverrideWorkload(v === true)}
+              />
+              Override Workload Guard (paksa assign)
+            </label>
             <Button
               onClick={handleAssign}
               disabled={loading === "assign"}

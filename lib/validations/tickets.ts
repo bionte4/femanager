@@ -55,6 +55,8 @@ export const assignEngineerSchema = z.object({
   ticket_id: z.string().min(1),
   engineer_id: z.string().min(1),
   notes: z.string().optional().nullable(),
+  /** Super admin: lewati Workload Guard */
+  override_workload: z.boolean().optional(),
 });
 
 export type CreateTicketInput = z.infer<typeof createTicketSchema>;

@@ -318,7 +318,7 @@ export async function autoDispatchTicket(
       1
   );
 
-  const nearby = await findEngineersForTicket({
+  const nearbyRaw = await findEngineersForTicket({
     tenantLat: ticket.tenant.lat,
     tenantLng: ticket.tenant.lng,
     tenantId: ticket.tenant.id,
@@ -328,14 +328,29 @@ export async function autoDispatchTicket(
     requiresCertification: requiresCert,
     preferToolkit,
     excludeIds: treatAsReassign ? excludeForReassign : triedEngineerIds,
-    limit: Math.max(5, requiredEngineers + 2),
+    // Ambil kandidat lebih banyak lalu filter Workload Guard
+    limit: Math.max(15, requiredEngineers + 10),
     pkwtOnly: options?.pkwtOnly,
+  });
+
+  const ticketEstMinutes =
+    ticket.service_package?.estimated_duration ??
+    ticket.service_category?.estimated_duration_minutes ??
+    category?.estimated_duration_minutes ??
+    60;
+
+  const { filterEngineersByWorkload } = await import("@/lib/workload-guard");
+  const nearby = await filterEngineersByWorkload(nearbyRaw, {
+    excludeTicketId: ticket.id,
+    extraLoadMinutes: ticketEstMinutes,
   });
 
   if (nearby.length === 0) {
     const aliasHint = categoryCode
       ? ` skill ∈ [${skillAliasesForCategory(categoryCode).join(", ")}]`
       : "";
+    const overloadOnly =
+      nearbyRaw.length > 0 && nearby.length === 0;
     await prisma.$transaction(async (tx) => {
       await tx.ticket.update({
         where: { id: ticket.id },
@@ -346,9 +361,11 @@ export async function autoDispatchTicket(
           ticket_id: ticket.id,
           status_from: ticket.status,
           status_to: TicketStatus.ESCALATED,
-          notes: categoryCode
-            ? `Auto-dispatch gagal: tidak ada FE${aliasHint}${requiresCert ? " + sertifikasi aktif" : ""}${options?.pkwtOnly ? " (pool PKWT penempatan)" : ""} di dekat lokasi`
-            : `Auto-dispatch gagal: tidak ada engineer AVAILABLE${options?.pkwtOnly ? " di pool PKWT" : ""} di dekat lokasi`,
+          notes: overloadOnly
+            ? `Auto-dispatch gagal: semua FE cocok overload (Workload Guard). Kandidat skill/lokasi: ${nearbyRaw.length}`
+            : categoryCode
+              ? `Auto-dispatch gagal: tidak ada FE${aliasHint}${requiresCert ? " + sertifikasi aktif" : ""}${options?.pkwtOnly ? " (pool PKWT penempatan)" : ""} di dekat lokasi`
+              : `Auto-dispatch gagal: tidak ada engineer AVAILABLE${options?.pkwtOnly ? " di pool PKWT" : ""} di dekat lokasi`,
           photo_url: [],
         },
       });
@@ -361,14 +378,18 @@ export async function autoDispatchTicket(
     void notifyEscalateL1({
       id: ticket.id,
       ticket_no: ticket.ticket_no,
-      reason: "Auto-dispatch gagal — tidak ada FE cocok",
+      reason: overloadOnly
+        ? "Auto-dispatch gagal — Workload Guard (semua FE overload)"
+        : "Auto-dispatch gagal — tidak ada FE cocok",
     });
 
     return {
       success: false,
       ticket_id: ticketId,
       escalated: true,
-      error: "Tidak ada engineer tersedia",
+      error: overloadOnly
+        ? "Semua engineer cocok sedang overload (Workload Guard)"
+        : "Tidak ada engineer tersedia",
     };
   }
 
@@ -441,6 +462,12 @@ export async function autoDispatchTicket(
       ticket_no: ticket.ticket_no,
       tenantName: ticket.tenant.name,
     })
+  );
+
+  void import("@/lib/time-tracker").then(({ recomputeTicketTimeSummary }) =>
+    recomputeTicketTimeSummary(ticket.id).catch((e) =>
+      console.error("[time-tracker]", e)
+    )
   );
 
   // Paket besar: notify FE tambahan sebagai helper (primary tetap nearby[0])

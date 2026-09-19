@@ -8,6 +8,7 @@ import {
   saveSmtpSettingsAction,
   saveTelegramSettingsAction,
   saveWhatsappSettingsAction,
+  saveWorkloadSettingsAction,
   testAiAction,
   testSmtpAction,
   testTelegramAction,
@@ -19,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export function IntegrationsSettingsClient({
   initial,
@@ -50,6 +52,17 @@ export function IntegrationsSettingsClient({
   const [aiBase, setAiBase] = useState(initial.ai.base_url);
   const [aiModel, setAiModel] = useState(initial.ai.model);
   const [aiKey, setAiKey] = useState("");
+
+  const [wlEnabled, setWlEnabled] = useState(initial.workload.enabled);
+  const [wlMaxActive, setWlMaxActive] = useState(
+    String(initial.workload.max_active_tickets)
+  );
+  const [wlMaxLoad, setWlMaxLoad] = useState(
+    String(initial.workload.max_load_minutes)
+  );
+  const [wlWarnLoad, setWlWarnLoad] = useState(
+    String(initial.workload.warn_load_minutes)
+  );
 
   async function saveWa() {
     setBusy("wa-save");
@@ -110,6 +123,20 @@ export function IntegrationsSettingsClient({
     if (!res.success) return toast.error(res.error);
     toast.success("AI card disimpan");
     setAiKey("");
+    router.refresh();
+  }
+
+  async function saveWorkload() {
+    setBusy("wl-save");
+    const res = await saveWorkloadSettingsAction({
+      enabled: wlEnabled,
+      max_active_tickets: Number(wlMaxActive) || 2,
+      max_load_minutes: Number(wlMaxLoad) || 240,
+      warn_load_minutes: Number(wlWarnLoad) || 180,
+    });
+    setBusy(null);
+    if (!res.success) return toast.error(res.error);
+    toast.success("Workload Guard disimpan");
     router.refresh();
   }
 
@@ -439,6 +466,74 @@ export function IntegrationsSettingsClient({
               }}
             >
               {busy === "ai-test" ? "Mengetes…" : "Test AI"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex flex-wrap items-center gap-2">
+            <CardTitle className="text-base">Workload Guard</CardTitle>
+            <Badge variant={wlEnabled ? "success" : "secondary"}>
+              {wlEnabled ? "Enabled" : "Disabled"}
+            </Badge>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Batas beban FE untuk auto-dispatch &amp; assign manual. Disimpan di
+            database (ops.workload).
+          </p>
+        </CardHeader>
+        <CardContent className="grid gap-3 sm:grid-cols-2">
+          <label className="flex items-center gap-2 text-sm sm:col-span-2">
+            <Checkbox
+              checked={wlEnabled}
+              onCheckedChange={(v) => setWlEnabled(v === true)}
+            />
+            Aktifkan Workload Guard
+          </label>
+          <div className="space-y-1">
+            <Label>MAX_ACTIVE (ticket)</Label>
+            <Input
+              type="number"
+              min={1}
+              max={20}
+              value={wlMaxActive}
+              onChange={(e) => setWlMaxActive(e.target.value)}
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Max ticket aktif per engineer (default 2)
+            </p>
+          </div>
+          <div className="space-y-1">
+            <Label>MAX_LOAD (menit)</Label>
+            <Input
+              type="number"
+              min={30}
+              max={1440}
+              value={wlMaxLoad}
+              onChange={(e) => setWlMaxLoad(e.target.value)}
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Max total estimasi durasi ticket aktif (default 240)
+            </p>
+          </div>
+          <div className="space-y-1 sm:col-span-2">
+            <Label>WARN_LOAD (menit)</Label>
+            <Input
+              type="number"
+              min={15}
+              max={1440}
+              value={wlWarnLoad}
+              onChange={(e) => setWlWarnLoad(e.target.value)}
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Ambang kuning di UI assign (default 180, harus ≤ MAX_LOAD)
+            </p>
+          </div>
+          <div className="sm:col-span-2">
+            <Button disabled={!!busy} onClick={() => void saveWorkload()}>
+              {busy === "wl-save" ? "Menyimpan…" : "Simpan Workload Guard"}
             </Button>
           </div>
         </CardContent>

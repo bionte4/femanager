@@ -8,12 +8,14 @@ import {
   DEFAULT_SMTP,
   DEFAULT_TELEGRAM,
   DEFAULT_WHATSAPP,
+  DEFAULT_WORKLOAD,
   SETTING_KEYS,
   getAiSettings,
   getSettingJson,
   getSmtpSettings,
   getTelegramSettings,
   getWhatsappSettings,
+  getWorkloadSettings,
   maskSecret,
   mergeSecret,
   setSettingJson,
@@ -21,6 +23,7 @@ import {
   type SmtpSettings,
   type TelegramSettings,
   type WhatsappSettings,
+  type WorkloadSettings,
 } from "@/lib/app-settings";
 import { sendWhatsApp } from "@/lib/whatsapp";
 import { sendTelegram } from "@/lib/telegram";
@@ -65,15 +68,17 @@ export type IntegrationsPublicConfig = {
     model: string;
     api_key: { configured: boolean; hint: string };
   };
+  workload: WorkloadSettings;
 };
 
 export async function getIntegrationsSettingsAction(): Promise<IntegrationsPublicConfig> {
   await requireSettingsAdmin();
-  const [wa, tg, smtp, ai] = await Promise.all([
+  const [wa, tg, smtp, ai, workload] = await Promise.all([
     getWhatsappSettings(),
     getTelegramSettings(),
     getSmtpSettings(),
     getAiSettings(),
+    getWorkloadSettings(),
   ]);
 
   const waDb = await getSettingJson(SETTING_KEYS.whatsapp);
@@ -111,6 +116,7 @@ export async function getIntegrationsSettingsAction(): Promise<IntegrationsPubli
       model: ai.model,
       api_key: maskSecret(ai.api_key),
     },
+    workload,
   };
 }
 
@@ -261,6 +267,40 @@ export async function saveAiSettingsAction(
     return {
       success: false,
       error: e instanceof Error ? e.message : "Gagal simpan AI",
+    };
+  }
+}
+
+const workloadSchema = z.object({
+  enabled: z.boolean(),
+  max_active_tickets: z.coerce.number().int().min(1).max(20),
+  max_load_minutes: z.coerce.number().int().min(30).max(24 * 60),
+  warn_load_minutes: z.coerce.number().int().min(15).max(24 * 60),
+});
+
+export async function saveWorkloadSettingsAction(
+  input: z.infer<typeof workloadSchema>
+): Promise<ActionResult> {
+  try {
+    const session = await requireSettingsAdmin();
+    const parsed = workloadSchema.parse(input);
+    let warn = parsed.warn_load_minutes;
+    if (warn > parsed.max_load_minutes) warn = parsed.max_load_minutes;
+    const next: WorkloadSettings = {
+      ...DEFAULT_WORKLOAD,
+      enabled: parsed.enabled,
+      max_active_tickets: parsed.max_active_tickets,
+      max_load_minutes: parsed.max_load_minutes,
+      warn_load_minutes: warn,
+    };
+    await setSettingJson(SETTING_KEYS.workload, next, session.user.id);
+    revalidatePath("/admin/integrations");
+    revalidatePath("/admin/settings/integrations");
+    return { success: true };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Gagal simpan Workload Guard",
     };
   }
 }
