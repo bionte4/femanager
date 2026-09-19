@@ -5,6 +5,8 @@ Stack: **Docker PostGIS** · **Node 20** · **PM2** · **Nginx** · **Let's Encr
 
 Dokumen terkait: [MANUAL_GUIDE.md](./MANUAL_GUIDE.md) · [ENGAGEMENT.md](./ENGAGEMENT.md) · [README.md](../README.md)
 
+**Pasca reboot VPS:** langsung ke [§11 VPS reboot](#11-vps-reboot-auto-start--recovery).
+
 ---
 
 ## 0. Instance production (aktif)
@@ -406,7 +408,141 @@ Disarankan copy dump ke storage luar (bukan hanya disk VPS yang sama).
 
 ---
 
-## 11. Runbook harian / kejadian
+## 11. VPS reboot (auto-start & recovery)
+
+Setelah server reboot (maintenance provider, kernel update, power cycle), layanan **harusnya naik sendiri** jika setup awal sudah benar. Bagian ini = checklist verifikasi + perbaikan jika ada yang tidak naik.
+
+### Apa yang auto-start (harapan)
+
+| Layanan | Mekanisme | Syarat sudah di-set |
+|---------|-----------|---------------------|
+| Docker daemon | `systemd` | `sudo systemctl enable docker` |
+| Container Postgres | `restart: unless-stopped` | compose pernah `up -d` |
+| Nginx | `systemd` | `sudo systemctl enable nginx` |
+| Next.js (`fetrack`) | PM2 resurrect | `pm2 save` + `pm2 startup` (jalankan perintah `sudo` yang dicetak) |
+| Crontab cron jobs | crontab user | `crontab -l` sudah terisi (persist otomatis) |
+| Certbot renew | systemd timer | terpasang saat `certbot --nginx` |
+| Backup 03:00 | crontab | script `/usr/local/bin/fetrack-backup.sh` |
+
+Timezone tetap `Asia/Jakarta` (persist di OS). Data DB di volume Docker `postgres_data` **tidak hilang** karena reboot.
+
+### One-time: pastikan survive reboot
+
+Jalankan sekali (atau setelah recreate VPS):
+
+```bash
+# Systemd
+sudo systemctl enable --now docker
+sudo systemctl enable --now nginx
+
+# Docker Postgres (path compose di VPS)
+cd /opt/fetrack
+docker compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml ps
+# Pastikan di YAML: restart: unless-stopped
+
+# PM2 auto-start setelah reboot
+cd /opt/fetrack
+pm2 start npm --name fetrack -- start   # jika belum ada
+pm2 save
+pm2 startup
+# WAJIB copy-paste & jalankan baris `sudo env PATH=...` yang dicetak PM2
+sudo systemctl daemon-reload
+sudo systemctl enable pm2-$(whoami)     # nama unit biasanya pm2-ubuntu
+
+# Verifikasi unit
+systemctl is-enabled docker nginx
+systemctl is-enabled "pm2-$(whoami)" || systemctl list-unit-files | grep pm2
+crontab -l | head
+```
+
+Tanpa `pm2 save` + `pm2 startup` (sudo), setelah reboot **app Next.js mati** meski Docker/Nginx hidup → Nginx 502.
+
+### Checklist setelah reboot (5 menit)
+
+SSH ke VPS, lalu:
+
+```bash
+# 1) OS & waktu
+uptime
+timedatectl   # Asia/Jakarta
+
+# 2) Docker + DB
+sudo systemctl status docker --no-pager | head -15
+docker ps --filter name=fetrack-postgres
+# Jika kosong:
+cd /opt/fetrack && docker compose -f docker-compose.prod.yml up -d
+# Tunggu sehat:
+until docker exec fetrack-postgres pg_isready -U postgres -d fetrack; do sleep 2; done
+
+# 3) App PM2
+pm2 status
+# Jika list kosong / stopped:
+pm2 resurrect
+# atau:
+cd /opt/fetrack && pm2 start npm --name fetrack -- start && pm2 save
+curl -s -o /dev/null -w "app:%{http_code}\n" http://127.0.0.1:3000/login
+
+# 4) Nginx + HTTPS publik
+sudo systemctl status nginx --no-pager | head -10
+curl -s -o /dev/null -w "https:%{http_code}\n" https://klikhadir.site/login
+# harapan: 200
+
+# 5) Cron masih ada
+crontab -l | sed 's/Bearer .*/Bearer ***/'
+```
+
+Smoke UI: buka `https://klikhadir.site/login` → login admin.
+
+### Urutan recovery jika 502 / DB down
+
+Postgres harus hidup **sebelum** Next.js/Prisma stabil.
+
+```bash
+cd /opt/fetrack
+
+# A. DB dulu
+sudo systemctl start docker
+docker compose -f docker-compose.prod.yml up -d
+until docker exec fetrack-postgres pg_isready -U postgres -d fetrack; do sleep 2; done
+
+# B. App
+pm2 resurrect || pm2 start npm --name fetrack -- start
+pm2 save
+curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:3000/login
+
+# C. Proxy
+sudo systemctl start nginx
+sudo nginx -t && sudo systemctl reload nginx
+curl -s -o /dev/null -w "%{http_code}\n" https://klikhadir.site/login
+```
+
+### Gejala khas pasca-reboot
+
+| Gejala | Penyebab umum | Perbaikan |
+|--------|---------------|-----------|
+| 502 Bad Gateway | PM2 belum resurrect | `pm2 resurrect` atau start ulang + `pm2 save` |
+| PM2 empty setelah reboot | Belum `pm2 startup` / belum `save` | Jalankan setup one-time di atas |
+| Prisma / login error DB | Postgres belum ready | Tunggu `pg_isready`, lalu `pm2 restart fetrack` |
+| `docker: permission denied` | Session baru / group docker | `newgrp docker` atau login SSH ulang |
+| Cron diam | Crontab user hilang (jarang) | Pasang ulang dari §9 |
+| HTTPS gagal, HTTP OK | Nginx/cert timer | `sudo systemctl start nginx`; `sudo certbot renew --dry-run` |
+
+### Reboot terjadwal (opsional)
+
+```bash
+# Sebelum reboot (opsional — kurangi crash mid-write)
+pm2 stop fetrack
+docker compose -f /opt/fetrack/docker-compose.prod.yml stop
+
+sudo reboot
+
+# Setelah up: ikuti checklist di atas (compose up + pm2 resurrect biasanya otomatis)
+```
+
+---
+
+## 12. Runbook harian / kejadian
 
 ### Status cepat
 
@@ -454,7 +590,7 @@ UI: `https://klikhadir.site/admin/integrations` (kartu WA / SMTP / AI + Customer
 
 ---
 
-## 12. Checklist go-live / audit
+## 13. Checklist go-live / audit
 
 - [ ] DNS → VPS; HTTPS Certbot aktif
 - [ ] `NEXTAUTH_URL=https://klikhadir.site`
@@ -462,8 +598,10 @@ UI: `https://klikhadir.site/admin/integrations` (kartu WA / SMTP / AI + Customer
 - [ ] Postgres bind `127.0.0.1` saja
 - [ ] `migrate deploy` OK; **tanpa** seed production
 - [ ] Super Admin via `scripts/create-admin.ts`
-- [ ] PM2 `startup` + `save`
-- [ ] Crontab 5 job + backup 03:00
+- [ ] PM2 `startup` + `save` (**wajib** agar survive reboot)
+- [ ] `systemctl enable docker nginx` + Postgres `restart: unless-stopped`
+- [ ] Uji simulasi: `sudo reboot` → checklist §11 (HTTPS 200, PM2 online, cron ada)
+- [ ] Crontab 6 job (+ birthday 08:00) + backup 03:00
 - [ ] Timezone `Asia/Jakarta`
 - [ ] UFW 22/80/443
 - [ ] Smoke: login, logout → `/login`, ticket, upload, cron HTTP 200
@@ -471,10 +609,12 @@ UI: `https://klikhadir.site/admin/integrations` (kartu WA / SMTP / AI + Customer
 
 ---
 
-## 13. Troubleshooting operasional
+## 14. Troubleshooting operasional
 
 | Gejala | Perbaikan |
 |--------|-----------|
+| Setelah reboot 502 | PM2 tidak auto-start — lihat §11; `pm2 resurrect` / `pm2 startup` |
+| Setelah reboot DB refused | Tunggu Docker/Postgres; `compose up -d` lalu `pm2 restart fetrack` |
 | Nginx 404 di `:3000` publik | Jangan expose 3000; pakai `https://klikhadir.site` via Nginx |
 | 502 Bad Gateway | `pm2 status`; app di `:3000`; `nginx -t` |
 | Login loop / session hilang | Samakan `NEXTAUTH_URL` dengan URL browser; restart PM2 |
@@ -501,7 +641,7 @@ tail -n 20 /var/backups/fetrack/backup.log
 
 ---
 
-## 14. Keamanan
+## 15. Keamanan
 
 1. SSH key-only bila memungkinkan.
 2. Jangan commit `.env`.
@@ -512,7 +652,7 @@ tail -n 20 /var/backups/fetrack/backup.log
 
 ---
 
-## 15. Referensi cepat
+## 16. Referensi cepat
 
 ```bash
 # Status
@@ -531,4 +671,10 @@ sudo certbot renew --dry-run
 
 # Backup manual
 /usr/local/bin/fetrack-backup.sh
+
+# Pasca-reboot (lihat §11)
+docker ps --filter name=fetrack-postgres
+pm2 status
+pm2 resurrect   # jika list kosong
+curl -s -o /dev/null -w "%{http_code}\n" https://klikhadir.site/login
 ```
