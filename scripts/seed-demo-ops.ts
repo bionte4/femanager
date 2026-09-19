@@ -735,6 +735,9 @@ async function main() {
 
   const kb = await seedKb();
   console.log("  kb:", kb);
+  if (kb.total < 30) {
+    console.warn("  WARNING: KB catalog lebih kecil dari expected — cek seed-knowledge-base.ts");
+  }
 
   console.log("\n========== DEMO LOGIN ==========");
   if (admin) console.log(`  Admin:   ${admin.phone} (password yang sudah dibuat)`);
