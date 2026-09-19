@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { CandidateStatus } from "@prisma/client";
-import { DEFAULT_MAP_CENTER, OPENFREEMAP_STYLE } from "@/lib/map";
+import { DEFAULT_MAP_CENTER, DEFAULT_MAP_STYLE } from "@/lib/map";
 
 const STATUS_COLOR: Record<string, string> = {
   NEW: "#3b82f6",
@@ -40,11 +40,13 @@ export function CandidateMap({ points }: { points: Point[] }) {
 
     const map = new maplibregl.Map({
       container: ref.current,
-      style: OPENFREEMAP_STYLE.positron,
+      style: DEFAULT_MAP_STYLE,
       center,
       zoom: 5,
     });
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+    map.on("load", () => map.resize());
+    requestAnimationFrame(() => map.resize());
 
     for (const p of valid) {
       const el = document.createElement("div");

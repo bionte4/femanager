@@ -6,7 +6,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { reverseGeocode, type ReverseGeocodeResult } from "@/lib/geocode";
-import { DEFAULT_MAP_CENTER, OPENFREEMAP_STYLE } from "@/lib/map";
+import { DEFAULT_MAP_CENTER, DEFAULT_MAP_STYLE } from "@/lib/map";
 import { cn } from "@/lib/utils";
 
 type MapPickerProps = {
@@ -53,9 +53,10 @@ export function MapPicker({
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
+    const container = containerRef.current;
     const map = new maplibregl.Map({
-      container: containerRef.current,
-      style: OPENFREEMAP_STYLE.liberty,
+      container,
+      style: DEFAULT_MAP_STYLE,
       center: lng && lat ? [lng, lat] : DEFAULT_MAP_CENTER,
       zoom: 12,
     });
@@ -78,10 +79,17 @@ export function MapPicker({
       void resolveAddress(e.lngLat.lat, e.lngLat.lng);
     });
 
+    const resize = () => map.resize();
+    const ro = new ResizeObserver(resize);
+    ro.observe(container);
+    map.on("load", resize);
+    requestAnimationFrame(resize);
+
     mapRef.current = map;
     markerRef.current = marker;
 
     return () => {
+      ro.disconnect();
       map.remove();
       mapRef.current = null;
       markerRef.current = null;

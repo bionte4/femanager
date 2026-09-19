@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { DEFAULT_MAP_CENTER, OPENFREEMAP_STYLE } from "@/lib/map";
+import { DEFAULT_MAP_CENTER, DEFAULT_MAP_STYLE } from "@/lib/map";
 import { cn } from "@/lib/utils";
 
 type TenantMapStatus = "up" | "down" | "alert";
@@ -226,13 +226,14 @@ export function MonitoringMap() {
 
   createTicketRef.current = handleCreateTicket;
 
-  // Init map sekali — MapLibre + OpenFreeMap (tanpa token)
+  // Init map sekali — MapLibre + raster CARTO (gratis, stabil)
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
+    const container = mapContainerRef.current;
     const map = new maplibregl.Map({
-      container: mapContainerRef.current,
-      style: OPENFREEMAP_STYLE.positron,
+      container,
+      style: DEFAULT_MAP_STYLE,
       center: DEFAULT_MAP_CENTER,
       zoom: 10,
     });
@@ -240,7 +241,14 @@ export function MonitoringMap() {
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
     map.addControl(new maplibregl.FullscreenControl(), "bottom-right");
 
+    // Flex layout sering bikin canvas 0px → resize setelah mount
+    const resize = () => map.resize();
+    const ro = new ResizeObserver(resize);
+    ro.observe(container);
+    requestAnimationFrame(resize);
+
     map.on("load", () => {
+      resize();
       map.addSource("tenants", {
         type: "geojson",
         data: { type: "FeatureCollection", features: [] },
@@ -347,6 +355,7 @@ export function MonitoringMap() {
     mapRef.current = map;
 
     return () => {
+      ro.disconnect();
       popupRef.current?.remove();
       engineerMarkersRef.current.forEach((m) => m.remove());
       engineerMarkersRef.current = [];
@@ -355,7 +364,7 @@ export function MonitoringMap() {
     };
   }, []);
 
-  // Update tenant geojson + store for popup
+  // Update tenant geojson + store for popup + fit bounds
   useEffect(() => {
     (window as unknown as { __mapTenants?: MapTenant[] }).__mapTenants =
       data?.tenants ?? [];
@@ -365,11 +374,20 @@ export function MonitoringMap() {
     const apply = () => {
       const source = map.getSource("tenants") as maplibregl.GeoJSONSource | undefined;
       if (source) source.setData(geojson);
+
+      const points = data?.tenants ?? [];
+      if (points.length === 0) return;
+      const bounds = new maplibregl.LngLatBounds();
+      points.forEach((t) => bounds.extend([t.lng, t.lat]));
+      data?.engineers.forEach((e) => bounds.extend([e.lng, e.lat]));
+      if (!bounds.isEmpty()) {
+        map.fitBounds(bounds, { padding: 48, maxZoom: 12, duration: 600 });
+      }
     };
 
     if (map.isStyleLoaded()) apply();
     else map.once("load", apply);
-  }, [geojson, data?.tenants]);
+  }, [geojson, data?.tenants, data?.engineers]);
 
   // Engineer markers (biru)
   useEffect(() => {
