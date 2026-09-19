@@ -7,6 +7,11 @@ import { AgreementSignForm } from "@/components/engineer/agreement-sign-form";
 import { DownloadAgreementPdfButton } from "@/components/engineer/download-agreement-pdf";
 import { HardRedirect } from "@/components/engineer/hard-redirect";
 import { Button } from "@/components/ui/button";
+import { EngineerLogoutButton } from "@/components/engineer/logout-button";
+
+/** Selalu dinamis — hindari cache RSC yang bikin blank/stale setelah login FE baru */
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 function toolsFromUser(user: {
   tools_owned: unknown;
@@ -35,8 +40,39 @@ export default async function EngineerAgreementPage({ searchParams }: PageProps)
   const sp = await Promise.resolve(searchParams ?? {});
   const viewOnly = sp.view === "1";
 
-  const data = await getActiveAgreementForEngineer(session.user.id);
+  let data: Awaited<ReturnType<typeof getActiveAgreementForEngineer>>;
+  try {
+    data = await getActiveAgreementForEngineer(session.user.id);
+  } catch (e) {
+    console.error("[agreement] getActiveAgreementForEngineer", e);
+    return (
+      <div className="space-y-4 py-6">
+        <h1 className="text-xl font-semibold tracking-tight">
+          Perjanjian Kemitraan
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Gagal memuat template perjanjian. Coba muat ulang atau hubungi admin.
+        </p>
+        <div className="flex flex-col gap-2">
+          <Button asChild variant="default" className="w-full">
+            <Link href="/engineer/agreement">Muat ulang</Link>
+          </Button>
+          <EngineerLogoutButton
+            label="Keluar / ganti akun"
+            variant="outline"
+            className="w-full"
+          />
+        </div>
+      </div>
+    );
+  }
+
   if (!data) redirect("/login");
+
+  // PKWT tidak pakai agreement — arahkan ke gate employment
+  if (data.user.engagement_type !== "MITRA") {
+    return <HardRedirect href="/engineer/employment-blocked" />;
+  }
 
   const userSigned = data.user.partnership_status === PartnershipStatus.SIGNED;
 
@@ -52,6 +88,11 @@ export default async function EngineerAgreementPage({ searchParams }: PageProps)
         <p className="text-sm text-muted-foreground">
           Belum ada template perjanjian aktif. Hubungi admin.
         </p>
+        <EngineerLogoutButton
+          label="Keluar / ganti akun"
+          variant="outline"
+          className="w-full"
+        />
       </div>
     );
   }

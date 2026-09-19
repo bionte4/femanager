@@ -3,8 +3,9 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
-  eligibleForWork,
+  evaluateEligibility,
   engagementLabel,
+  findActiveContract,
   isMitraEngagement,
   isPkwtEngagement,
 } from "@/lib/eligibility";
@@ -13,7 +14,31 @@ import { PwaRegister } from "@/components/engineer/pwa-register";
 import { PushRegister } from "@/components/engineer/push-register";
 import { KbChatWidget } from "@/components/kb/kb-chat-widget";
 import { EngineerLogoutButton } from "@/components/engineer/logout-button";
+import { HardRedirect } from "@/components/engineer/hard-redirect";
 import { Badge } from "@/components/ui/badge";
+
+function resolvePathname(headerList: Headers): string {
+  // Middleware set x-pathname; fallback lain untuk soft-nav / proxy
+  const candidates = [
+    headerList.get("x-pathname"),
+    headerList.get("x-invoke-path"),
+    headerList.get("next-url"),
+    headerList.get("x-url"),
+    headerList.get("referer"),
+  ];
+  for (const raw of candidates) {
+    if (!raw) continue;
+    try {
+      if (raw.startsWith("http")) {
+        return new URL(raw).pathname;
+      }
+      if (raw.startsWith("/")) return raw.split("?")[0] ?? raw;
+    } catch {
+      /* ignore */
+    }
+  }
+  return "";
+}
 
 export default async function EngineerLayout({
   children,
@@ -28,52 +53,89 @@ export default async function EngineerLayout({
     redirect("/admin/dashboard");
   }
 
+  // Satu query user (hindari double fetch auth + eligibleForWork)
   const me = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { engagement_type: true },
+    select: {
+      id: true,
+      role: true,
+      is_suspended: true,
+      engagement_type: true,
+      employment_status: true,
+      partnership_status: true,
+    },
   });
 
-  const elig = await eligibleForWork(session.user.id);
-  const engagement = me?.engagement_type ?? "MITRA";
+  if (!me) {
+    redirect("/login");
+  }
+
+  const engagement = me.engagement_type ?? "MITRA";
   const isMitra = isMitraEngagement(engagement);
   const isPkwt = isPkwtEngagement(engagement);
+
+  const contract = isPkwt ? await findActiveContract(session.user.id) : null;
+  const elig = evaluateEligibility(me, {
+    hasActiveContract: !!contract,
+    contractId: contract?.id,
+  });
   const canWork = elig.ok;
 
   const headerList = await headers();
-  const pathname =
-    headerList.get("x-pathname") ??
-    headerList.get("x-invoke-path") ??
-    headerList.get("next-url") ??
-    "";
+  const pathname = resolvePathname(headerList);
+  const pathnameKnown = pathname.length > 0;
   const onAgreement =
     pathname.includes("/engineer/agreement") || pathname.endsWith("/agreement");
   const onEmploymentBlocked =
     pathname.includes("/engineer/employment-blocked") ||
     pathname.endsWith("/employment-blocked");
 
-  // MITRA: wajib agreement (pathname kosong tetap treat sebagai perlu gate)
+  /**
+   * PENTING: pakai HardRedirect, bukan redirect() RSC.
+   * Soft redirect di layout sering nyangkut blank putih di /engineer/agreement
+   * (FE baru unsigned → gate partnership).
+   */
   if (
     isMitra &&
     !canWork &&
     elig.reason === "PARTNERSHIP_NOT_SIGNED" &&
+    pathnameKnown &&
     !onAgreement
   ) {
-    redirect("/engineer/agreement");
+    return <HardRedirect href="/engineer/agreement" />;
   }
 
-  // PKWT: skip agreement; block jika belum eligible
-  if (isPkwt && !canWork && !onEmploymentBlocked) {
-    redirect("/engineer/employment-blocked");
+  // Pathname tidak terbaca (edge case): unsigned Mitra → hard nav ke agreement
+  // (replace ke URL yang sama = reload penuh, lebih aman daripada soft-loop blank)
+  if (
+    isMitra &&
+    !canWork &&
+    elig.reason === "PARTNERSHIP_NOT_SIGNED" &&
+    !pathnameKnown
+  ) {
+    return <HardRedirect href="/engineer/agreement" />;
+  }
+
+  if (isPkwt && !canWork && pathnameKnown && !onEmploymentBlocked) {
+    return <HardRedirect href="/engineer/employment-blocked" />;
+  }
+
+  if (isPkwt && !canWork && !pathnameKnown) {
+    return <HardRedirect href="/engineer/employment-blocked" />;
   }
 
   if (canWork && onAgreement) {
-    redirect("/engineer/my-tickets");
+    return <HardRedirect href="/engineer/my-tickets" />;
   }
+
+  const showChromeExtras = canWork;
+  const skipPush = onAgreement || onEmploymentBlocked || !canWork;
 
   return (
     <div className="mx-auto min-h-screen max-w-lg bg-background">
       <PwaRegister />
-      <PushRegister />
+      {/* Jangan load Firebase/FCM di halaman agreement — bikin delay/blank di FE baru */}
+      {!skipPush && <PushRegister />}
       <header className="sticky top-0 z-30 border-b border-border bg-background/95 px-4 py-2.5 backdrop-blur">
         <div className="flex items-center justify-between">
           <div>
@@ -103,12 +165,12 @@ export default async function EngineerLayout({
         </div>
       </header>
 
-      <main className={`px-4 pt-3 ${canWork ? "pb-20" : "pb-6"}`}>
+      <main className={`px-4 pt-3 ${showChromeExtras ? "pb-20" : "pb-6"}`}>
         {children}
       </main>
 
-      {canWork && <EngineerBottomNav isPkwt={isPkwt} />}
-      {canWork && <KbChatWidget audience="engineer" />}
+      {showChromeExtras && <EngineerBottomNav isPkwt={isPkwt} />}
+      {showChromeExtras && <KbChatWidget audience="engineer" />}
     </div>
   );
 }
