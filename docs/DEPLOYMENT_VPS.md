@@ -218,24 +218,39 @@ npx tsx scripts/create-admin.ts
 
 Login: `https://klikhadir.site/login` → phone + password di atas.
 
-### Seed ops terbatas (2 Mitra + 1 PKWT + KB)
+### Seed demo terbatas (showcase)
 
-Bukan `prisma db seed` penuh. Hanya engineer uji + SOP KB + agreement aktif:
+Isi data demo cukup untuk presentasi — **bukan** full seed 100 toko:
+
+- SLA, kategori layanan, commission rules
+- 2 Mitra + 1 PKWT + agreement
+- 5 tenant + device EDC
+- Ticket OPEN / ASSIGNED / RESOLVED
+- Knowledge Base SOP
 
 ```bash
 cd /opt/fetrack
-SEED_PASSWORD='GantiPasswordKu4t' npx tsx scripts/seed-demo-ops.ts
-# atau: npm run seed:ops
+SEED_PASSWORD='DemoShow2026!' npx tsx scripts/seed-demo-ops.ts
 ```
 
-| Akun | Phone (default) | Tipe |
-|------|-----------------|------|
-| Mitra 1 | `081222222001` | Mitra, agreement signed |
-| Mitra 2 | `081222222002` | Mitra, agreement signed |
-| PKWT | `081222222003` | PKWT Outtask + kontrak ACTIVE |
+| Akun | Phone | Password |
+|------|-------|----------|
+| Mitra 1 | `081222222001` | `SEED_PASSWORD` |
+| Mitra 2 | `081222222002` | sama |
+| PKWT | `081222222003` | sama |
 
-Knowledge Base terisi dari `prisma/seed-knowledge-base.ts`.  
-**Ganti password** setelah uji.
+### Reset password
+
+Self-service email/OTP **belum** ada. Cara yang tersedia:
+
+1. **Admin UI** — Engineers → Edit → isi **Reset password** → Simpan  
+2. **CLI VPS**:
+```bash
+RESET_PHONE='081222222001' RESET_PASS='PasswordBaru123' \
+  npx tsx scripts/reset-password.ts
+```
+
+Login: `https://klikhadir.site/login` → phone + password.
 
 ---
 

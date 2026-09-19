@@ -111,6 +111,11 @@ export function LoginForm() {
           "Masuk"
         )}
       </Button>
+
+      <p className="text-center text-xs text-muted-foreground">
+        Lupa password? Hubungi admin NOC untuk di-reset, atau admin bisa reset
+        lewat menu Engineers → Edit (isi password baru).
+      </p>
     </form>
   );
 }

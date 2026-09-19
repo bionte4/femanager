@@ -60,8 +60,7 @@ export default async function LoginPage() {
             <LoginForm />
 
             <p className="mt-6 text-center text-xs text-muted-foreground">
-              Demo admin: 081111111111 · Engineer: 081222222221 · pass:
-              password123
+              Demo: seed ops di VPS · Lupa password? Hubungi admin / Edit Engineer.
             </p>
           </div>
         </div>

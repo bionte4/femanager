@@ -130,12 +130,20 @@ export function EngineerForm({ initial, onSuccess }: EngineerFormProps) {
 
       <div className="space-y-1.5">
         <Label htmlFor="password">
-          Password{" "}
+          {isEdit ? "Reset password" : "Password"}{" "}
           {isEdit && (
-            <span className="text-muted-foreground">(kosongkan jika tidak diubah)</span>
+            <span className="font-normal text-muted-foreground">
+              (isi untuk ganti; kosongkan = tidak diubah)
+            </span>
           )}
         </Label>
-        <Input id="password" type="password" {...register("password")} />
+        <Input
+          id="password"
+          type="password"
+          autoComplete="new-password"
+          placeholder={isEdit ? "Password baru (opsional)" : "Minimal 6 karakter"}
+          {...register("password")}
+        />
         {errors.password && (
           <p className="text-xs text-destructive">{errors.password.message}</p>
         )}
