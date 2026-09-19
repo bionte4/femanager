@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { mkdir, writeFile } from "fs/promises";
-import path from "path";
 import sharp from "sharp";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
+import { withUploadSignature, writeUploadFile } from "@/lib/storage";
 
 const ALLOWED = new Set(["image/jpeg", "image/png", "image/jpg"]);
 const MAX = 5 * 1024 * 1024;
 
 /**
- * Public upload untuk dokumen kandidat (KTP / selfie) — rate limited
+ * Public upload dokumen kandidat (KTP / selfie) — rate limited.
+ * File disimpan privat; URL diberi signature TTL 24 jam untuk preview form.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -23,10 +23,11 @@ export async function POST(req: NextRequest) {
 
     const form = await req.formData();
     const file = form.get("file");
-    const label = String(form.get("label") ?? "doc")
-      .toLowerCase()
-      .replace(/[^a-z0-9_-]/g, "")
-      .slice(0, 32) || "doc";
+    const label =
+      String(form.get("label") ?? "doc")
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]/g, "")
+        .slice(0, 32) || "doc";
 
     if (!(file instanceof File)) {
       return NextResponse.json({ success: false, error: "File wajib" }, { status: 400 });
@@ -45,15 +46,16 @@ export async function POST(req: NextRequest) {
       .jpeg({ quality: 75, mozjpeg: true })
       .toBuffer();
 
-    const dir = path.join(process.cwd(), "public", "uploads", "candidates");
-    await mkdir(dir, { recursive: true });
     const filename = `${label}-${Date.now()}.jpg`;
-    await writeFile(path.join(dir, filename), compressed);
+    const { url: baseUrl } = await writeUploadFile("candidates", filename, compressed);
+    // DB simpan path tanpa query; preview form pakai signed
+    const signed = withUploadSignature(baseUrl);
 
     return NextResponse.json({
       success: true,
-      url: `/uploads/candidates/${filename}`,
-      path: `/uploads/candidates/${filename}`,
+      url: baseUrl,
+      preview_url: signed,
+      path: baseUrl,
     });
   } catch (e) {
     console.error("[candidates/upload]", e);

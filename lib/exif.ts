@@ -1,6 +1,5 @@
 import { createHash } from "crypto";
 import { readFile } from "fs/promises";
-import path from "path";
 import exifr from "exifr";
 
 export type ExifGps = {
@@ -38,8 +37,16 @@ export async function readExifGpsFromBuffer(buffer: Buffer): Promise<ExifGps> {
 
 export async function readExifGpsFromPublicUrl(url: string): Promise<ExifGps> {
   try {
-    if (!url.startsWith("/uploads/")) return { lat: null, lng: null, timestamp: null };
-    const filePath = path.join(process.cwd(), "public", url.replace(/^\//, ""));
+    if (!url.startsWith("/uploads/") && !url.startsWith("/api/files/")) {
+      return { lat: null, lng: null, timestamp: null };
+    }
+    const { resolveUploadFileAbsolute } = await import("@/lib/storage");
+    const relative = url
+      .replace(/^\/api\/files\//, "")
+      .replace(/^\/uploads\//, "")
+      .split("?")[0];
+    const filePath = await resolveUploadFileAbsolute(relative);
+    if (!filePath) return { lat: null, lng: null, timestamp: null };
     const buffer = await readFile(filePath);
     return readExifGpsFromBuffer(buffer);
   } catch {
@@ -54,8 +61,16 @@ export function hashPhotoBuffer(buffer: Buffer): string {
 
 export async function hashPhotoFromPublicUrl(url: string): Promise<string | null> {
   try {
-    if (!url.startsWith("/uploads/")) return null;
-    const filePath = path.join(process.cwd(), "public", url.replace(/^\//, ""));
+    if (!url.startsWith("/uploads/") && !url.startsWith("/api/files/")) {
+      return null;
+    }
+    const { resolveUploadFileAbsolute } = await import("@/lib/storage");
+    const relative = url
+      .replace(/^\/api\/files\//, "")
+      .replace(/^\/uploads\//, "")
+      .split("?")[0];
+    const filePath = await resolveUploadFileAbsolute(relative);
+    if (!filePath) return null;
     const buffer = await readFile(filePath);
     return hashPhotoBuffer(buffer);
   } catch {

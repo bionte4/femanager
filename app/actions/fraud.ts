@@ -8,11 +8,11 @@ import {
   TicketStatus,
 } from "@prisma/client";
 import { auth, ADMIN_ROLES } from "@/lib/auth";
-import { requireAppAdmin } from "@/lib/rbac";
+import { requireMasterAdmin } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 
 async function requireAdmin() {
-  return requireAppAdmin();
+  return requireMasterAdmin();
 }
 
 export async function getFraudKpis() {

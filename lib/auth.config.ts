@@ -1,15 +1,11 @@
 import type { NextAuthConfig } from "next-auth";
+import {
+  ADMIN_ROLES,
+  CONTRACT_ADMIN_ROLES,
+  rolesForAdminPath,
+} from "@/lib/rbac-constants";
 
-export const ADMIN_ROLES = [
-  "SUPER_ADMIN",
-  "ADMIN_NOC",
-  "DISPATCHER",
-  "NOC_L0",
-  "NOC_L1",
-] as const;
-
-/** Manage kontrak PKWT / klasifikasi kerja — bukan L0/Dispatcher */
-export const CONTRACT_ADMIN_ROLES = ["SUPER_ADMIN", "ADMIN_NOC"] as const;
+export { ADMIN_ROLES, CONTRACT_ADMIN_ROLES };
 
 /** Role yang boleh escalate L0 → L1 */
 export const NOC_L0_ROLES = [
@@ -31,39 +27,7 @@ function isAdminRole(role: string | undefined): boolean {
 }
 
 function rolesAllowedForAdminPath(pathname: string): readonly string[] {
-  // Inline mirror of lib/rbac ADMIN_PATH_ROLE_RULES — Edge bundle tidak import Prisma/rbac server
-  const USERS = ["SUPER_ADMIN"] as const;
-  const MASTER = ["SUPER_ADMIN", "ADMIN_NOC"] as const;
-  const SYSTEM = ["SUPER_ADMIN", "ADMIN_NOC"] as const;
-  const ENGINEERS = [
-    "SUPER_ADMIN",
-    "ADMIN_NOC",
-    "DISPATCHER",
-    "NOC_L1",
-  ] as const;
-  const LEGAL = ["SUPER_ADMIN", "ADMIN_NOC", "DISPATCHER"] as const;
-
-  const rules: { prefix: string; roles: readonly string[] }[] = [
-    { prefix: "/admin/users", roles: USERS },
-    { prefix: "/admin/tenants", roles: MASTER },
-    { prefix: "/admin/devices", roles: MASTER },
-    { prefix: "/admin/service-categories", roles: MASTER },
-    { prefix: "/admin/spareparts", roles: MASTER },
-    { prefix: "/admin/hr", roles: MASTER },
-    { prefix: "/admin/payroll", roles: MASTER },
-    { prefix: "/admin/integrations", roles: SYSTEM },
-    { prefix: "/admin/settings", roles: SYSTEM },
-    { prefix: "/admin/legal", roles: LEGAL },
-    { prefix: "/admin/recruitment", roles: LEGAL },
-    { prefix: "/admin/engineers", roles: ENGINEERS },
-  ];
-
-  for (const rule of rules) {
-    if (pathname === rule.prefix || pathname.startsWith(rule.prefix + "/")) {
-      return rule.roles;
-    }
-  }
-  return ADMIN_ROLES;
+  return rolesForAdminPath(pathname);
 }
 
 /** Prefix API publik / non-session (punya auth sendiri) */
@@ -73,7 +37,8 @@ function isPublicApiPath(pathname: string): boolean {
     pathname.startsWith("/api/cron") ||
     pathname.startsWith("/api/webhooks") ||
     pathname.startsWith("/api/v1/external") ||
-    pathname.startsWith("/api/candidates")
+    pathname.startsWith("/api/candidates") ||
+    pathname.startsWith("/api/files")
   );
 }
 

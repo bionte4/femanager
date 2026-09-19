@@ -578,7 +578,15 @@ pm2 save
 pm2 logs fetrack --lines 30
 ```
 
-**Jangan** hapus `public/uploads/`.  
+**Jangan** hapus `public/uploads/` atau `storage/uploads/` (foto ticket / kandidat).  
+Setelah update ini, file baru masuk `storage/uploads/`; URL `/uploads/*` di-rewrite ke `/api/files` (auth / signed).
+
+```bash
+mkdir -p /opt/fetrack/storage/uploads
+# opsional migrasi legacy:
+# mv /opt/fetrack/public/uploads/* /opt/fetrack/storage/uploads/ 2>/dev/null || true
+```
+
 **Jangan** `pm2 restart` jika `npm run build` gagal — itu yang bikin UI Mapbox lama tetap tampil.
 
 Setelah ubah `.env`:

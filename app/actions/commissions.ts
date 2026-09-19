@@ -4,11 +4,10 @@ import { revalidatePath } from "next/cache";
 import { DeviceType, Prisma, SlaTier, TicketType } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { auth, ADMIN_ROLES } from "@/lib/auth";
-import { requireAppAdmin } from "@/lib/rbac";
+import { requireMasterAdmin } from "@/lib/rbac";
 
 async function requireAdmin() {
-  return requireAppAdmin();
+  return requireMasterAdmin();
 }
 
 export type ActionResult<T = undefined> =

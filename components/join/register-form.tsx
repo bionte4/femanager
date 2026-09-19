@@ -106,6 +106,10 @@ export function JoinRegisterForm() {
 
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<FormState>(INITIAL);
+  const [previewUrls, setPreviewUrls] = useState<{
+    ktp?: string;
+    selfie?: string;
+  }>({});
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState<string | null>(null);
 
@@ -133,8 +137,19 @@ export function JoinRegisterForm() {
       const res = await fetch("/api/candidates/upload", { method: "POST", body: fd });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.error ?? "Upload gagal");
-      if (label === "ktp") patch({ id_card_photo_url: json.url });
-      else patch({ selfie_photo_url: json.url });
+      if (label === "ktp") {
+        patch({ id_card_photo_url: json.url });
+        setPreviewUrls((p) => ({
+          ...p,
+          ktp: (json.preview_url as string) || (json.url as string),
+        }));
+      } else {
+        patch({ selfie_photo_url: json.url });
+        setPreviewUrls((p) => ({
+          ...p,
+          selfie: (json.preview_url as string) || (json.url as string),
+        }));
+      }
       toast.success("Upload berhasil");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Upload gagal");
@@ -510,10 +525,10 @@ export function JoinRegisterForm() {
                   if (f) void uploadDoc(f, "ktp");
                 }}
               />
-              {form.id_card_photo_url && (
+              {previewUrls.ktp && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={form.id_card_photo_url}
+                  src={previewUrls.ktp}
                   alt="KTP"
                   className="mt-2 h-28 rounded-lg object-cover"
                 />
@@ -530,10 +545,10 @@ export function JoinRegisterForm() {
                   if (f) void uploadDoc(f, "selfie");
                 }}
               />
-              {form.selfie_photo_url && (
+              {previewUrls.selfie && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={form.selfie_photo_url}
+                  src={previewUrls.selfie}
                   alt="Selfie"
                   className="mt-2 h-28 rounded-lg object-cover"
                 />
@@ -570,13 +585,13 @@ export function JoinRegisterForm() {
               Bank: {form.bank_name || "—"} {form.bank_account_no}
             </p>
             <div className="flex gap-2">
-              {form.id_card_photo_url && (
+              {previewUrls.ktp && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={form.id_card_photo_url} alt="" className="h-20 rounded" />
+                <img src={previewUrls.ktp} alt="" className="h-20 rounded" />
               )}
-              {form.selfie_photo_url && (
+              {previewUrls.selfie && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={form.selfie_photo_url} alt="" className="h-20 rounded" />
+                <img src={previewUrls.selfie} alt="" className="h-20 rounded" />
               )}
             </div>
             <p className="text-muted-foreground">

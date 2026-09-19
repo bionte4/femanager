@@ -1,6 +1,7 @@
 import { createHmac } from "crypto";
 import type { Integration, TicketStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { signUploadAccess, uploadPublicUrl } from "@/lib/storage";
 
 export type WebhookEvent =
   | "ticket.assigned"
@@ -59,7 +60,16 @@ function sleep(ms: number) {
 function absolutePhotoUrl(url: string): string {
   if (url.startsWith("http://") || url.startsWith("https://")) return url;
   const base = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
-  return `${base.replace(/\/$/, "")}${url.startsWith("/") ? url : `/${url}`}`;
+  const pathOnly = (url.startsWith("/") ? url : `/${url}`).split("?")[0];
+  let path = pathOnly;
+  if (pathOnly.startsWith("/uploads/")) {
+    const relative = pathOnly.replace(/^\/uploads\//, "");
+    const signed = signUploadAccess(relative, 60 * 60 * 24 * 7);
+    path = signed
+      ? `${uploadPublicUrl(relative)}?exp=${signed.exp}&sig=${signed.sig}`
+      : pathOnly;
+  }
+  return `${base.replace(/\/$/, "")}${path}`;
 }
 
 export async function buildWebhookPayload(

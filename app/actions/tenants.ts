@@ -148,6 +148,7 @@ export async function deleteTenant(id: string): Promise<ActionResult> {
 }
 
 export async function getTenantOptions() {
+  // sengaja requireAppAdmin: DISPATCHER/NOC butuh list id/name untuk form ticket
   await requireAdmin();
   return prisma.tenant.findMany({
     where: { is_active: true },

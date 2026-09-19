@@ -1,18 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { mkdir, writeFile } from "fs/promises";
-import path from "path";
 import sharp from "sharp";
 import { Role } from "@prisma/client";
 import { auth, ADMIN_ROLES } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { hashPhotoBuffer, readExifGpsFromBuffer } from "@/lib/exif";
+import { writeUploadFile } from "@/lib/storage";
 
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/jpg"]);
 const MAX_BYTES = 5 * 1024 * 1024; // 5MB
 
 /**
  * POST /api/upload
- * Baca EXIF GPS + hash SEBELUM compress, lalu simpan jpeg compressed.
+ * Baca EXIF GPS + hash SEBELUM compress, simpan ke storage privat.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -31,7 +30,6 @@ export async function POST(req: NextRequest) {
 
     const ticketId = rawTicketId.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64) || "general";
 
-    // IDOR guard: FE hanya boleh upload ke ticket assigned ke dirinya
     const isAdmin = (ADMIN_ROLES as readonly string[]).includes(session.user.role);
     if (!isAdmin && session.user.role === Role.FIELD_ENGINEER) {
       if (ticketId === "general") {
@@ -80,7 +78,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // EXIF + hash dari original (sebelum strip)
     const exif = await readExifGpsFromBuffer(buffer);
     const photoHash = hashPhotoBuffer(buffer);
 
@@ -95,13 +92,8 @@ export async function POST(req: NextRequest) {
       .jpeg({ quality: 70, mozjpeg: true })
       .toBuffer();
 
-    const dir = path.join(process.cwd(), "public", "uploads", "tickets", ticketId);
-    await mkdir(dir, { recursive: true });
-
     const filename = `${label}-${Date.now()}.jpg`;
-    await writeFile(path.join(dir, filename), compressed);
-
-    const url = `/uploads/tickets/${ticketId}/${filename}`;
+    const { url } = await writeUploadFile(`tickets/${ticketId}`, filename, compressed);
 
     return NextResponse.json({
       success: true,
