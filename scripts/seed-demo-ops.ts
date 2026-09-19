@@ -4,7 +4,7 @@
  * Isi:
  * - SLA + service categories/packages + commission rules inti
  * - Partnership agreement aktif
- * - 2 Mitra (signed) + 1 PKWT Outtask + kontrak
+ * - 2 Mitra signed + 1 Mitra PENDING TTD + 1 PKWT Outtask + kontrak
  * - 5 tenant + device EDC
  * - Beberapa ticket (OPEN / ASSIGNED / RESOLVED)
  * - Knowledge Base SOP
@@ -67,6 +67,22 @@ const MITRA = [
     birth_md: "03-15" as const,
   },
 ] as const;
+
+/** Mitra baru — belum TTD (untuk demo gate /engineer/agreement) */
+const MITRA_PENDING = {
+  phone: "081222222004",
+  full_name: "Dewi Mitra Depok",
+  city: "Depok",
+  district: "Beji",
+  lat: -6.4025,
+  lng: 106.7942,
+  skills: ["EDC", "WIFI"],
+  birth_md: "11-08" as const,
+} as const;
+
+/** PNG 1×1 transparan — valid data URL untuk preview TTD seed */
+const SEED_SIGNATURE_DATA_URL =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
 const PKWT = {
   phone: "081222222003",
@@ -400,7 +416,7 @@ async function upsertMitra(
       status: AgreementStatus.SIGNED,
       signed_at: new Date(),
       consent_text: PARTNERSHIP_CONSENT_TEXT,
-      signature_data: "seed-ops-signature",
+      signature_data: SEED_SIGNATURE_DATA_URL,
       ip_address: "127.0.0.1",
       user_agent: "seed-demo-ops",
     },
@@ -410,7 +426,7 @@ async function upsertMitra(
       status: AgreementStatus.SIGNED,
       signed_at: new Date(),
       consent_text: PARTNERSHIP_CONSENT_TEXT,
-      signature_data: "seed-ops-signature",
+      signature_data: SEED_SIGNATURE_DATA_URL,
       ip_address: "127.0.0.1",
       user_agent: "seed-demo-ops",
     },
@@ -420,6 +436,60 @@ async function upsertMitra(
     where: { engineer_id: u.id },
     update: {},
     create: { engineer_id: u.id, balance: 150000 },
+  });
+
+  return u;
+}
+
+/** Mitra belum TTD — hapus agreement lama agar gate /engineer/agreement aktif */
+async function upsertMitraPending(passwordHash: string) {
+  const eng = MITRA_PENDING;
+  const u = await prisma.user.upsert({
+    where: { phone: eng.phone },
+    update: {
+      full_name: eng.full_name,
+      password: passwordHash,
+      role: Role.FIELD_ENGINEER,
+      city: eng.city,
+      district: eng.district,
+      lat: eng.lat,
+      lng: eng.lng,
+      skills: [...eng.skills],
+      status: EngineerStatus.AVAILABLE,
+      engagement_type: EngagementType.MITRA,
+      employment_status: EmploymentStatus.NONE,
+      partnership_status: PartnershipStatus.NOT_SIGNED,
+      has_motorcycle: true,
+      has_toolkit: true,
+      is_suspended: false,
+      birth_date: demoBirthDate({ birth_md: eng.birth_md }),
+    },
+    create: {
+      full_name: eng.full_name,
+      phone: eng.phone,
+      password: passwordHash,
+      role: Role.FIELD_ENGINEER,
+      city: eng.city,
+      district: eng.district,
+      lat: eng.lat,
+      lng: eng.lng,
+      skills: [...eng.skills],
+      status: EngineerStatus.AVAILABLE,
+      engagement_type: EngagementType.MITRA,
+      employment_status: EmploymentStatus.NONE,
+      partnership_status: PartnershipStatus.NOT_SIGNED,
+      has_motorcycle: true,
+      has_toolkit: true,
+      birth_date: demoBirthDate({ birth_md: eng.birth_md }),
+    },
+  });
+
+  await prisma.engineerAgreement.deleteMany({ where: { engineer_id: u.id } });
+
+  await prisma.engineerWallet.upsert({
+    where: { engineer_id: u.id },
+    update: {},
+    create: { engineer_id: u.id, balance: 0 },
   });
 
   return u;
@@ -763,6 +833,8 @@ async function main() {
     mitraIds.push(u.id);
     console.log("  mitra:", u.phone);
   }
+  const pending = await upsertMitraPending(passwordHash);
+  console.log("  mitra PENDING TTD:", pending.phone);
   const pkwt = await upsertPkwt(passwordHash);
   console.log("  pkwt:", pkwt.phone);
 
@@ -789,8 +861,10 @@ async function main() {
   if (admin) console.log(`  Admin:   ${admin.phone} (password yang sudah dibuat)`);
   console.log(`  Mitra 1: ${MITRA[0].phone} / ${PASSWORD}`);
   console.log(`  Mitra 2: ${MITRA[1].phone} / ${PASSWORD}`);
+  console.log(`  Mitra NEW (belum TTD): ${MITRA_PENDING.phone} / ${PASSWORD}`);
   console.log(`  PKWT:    ${PKWT.phone} / ${PASSWORD}`);
   console.log("  Birthday: Mitra 1 = hari ini (uji cron /api/cron/birthday-greetings)");
+  console.log("  TTD demo: login Mitra NEW → /engineer/agreement");
   console.log("  Reset password: Edit Engineer di admin, atau scripts/reset-password.ts");
   console.log("================================");
 }

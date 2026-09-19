@@ -119,14 +119,19 @@ export default async function EngineerAgreementPage({ searchParams }: PageProps)
           className="prose prose-sm max-w-none rounded-xl border bg-card p-4 text-sm"
           dangerouslySetInnerHTML={{ __html: html }}
         />
-        {data.engineerAgreement.signature_data && (
+        {data.engineerAgreement.signature_data?.startsWith("data:image") ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={data.engineerAgreement.signature_data}
             alt="Tanda tangan"
-            className="h-24 rounded border bg-white"
+            className="h-24 rounded border bg-white p-2"
           />
-        )}
+        ) : data.engineerAgreement.signature_data ? (
+          <p className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            Tanda tangan tersimpan (format lama/placeholder). Unduh PDF atau
+            revoke + TTD ulang untuk preview gambar.
+          </p>
+        ) : null}
         <DownloadAgreementPdfButton
           title={data.agreement.title}
           version={data.agreement.version}
