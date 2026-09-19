@@ -5,7 +5,8 @@ import { LoginForm } from "@/components/auth/login-form";
 
 export const metadata = {
   title: "Login | FE-Track",
-  description: "Masuk ke FE-Track Field Engineer Dispatch",
+  description:
+    "Platform penugasan field engineer untuk menjaga SLA toko se-Indonesia",
 };
 
 export default async function LoginPage() {
@@ -45,7 +46,8 @@ export default async function LoginPage() {
               FE-Track
             </p>
             <p className="mt-3 max-w-sm text-base leading-relaxed text-emerald-100/70">
-              Dispatch field engineer. Jaga SLA toko se-Indonesia tetap meet.
+              Platform penugasan field engineer. Menjaga SLA toko se-Indonesia
+              tetap terpenuhi.
             </p>
           </div>
 
