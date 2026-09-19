@@ -557,18 +557,29 @@ ls -lt /var/backups/fetrack | head
 
 ```bash
 cd /opt/fetrack
-git pull origin main
-rm -rf fetrack   # jika sempat nested clone
-npm ci
+git fetch origin
+git reset --hard origin/main   # samakan persis dengan GitHub (hindari dirty tree)
+git log -1 --oneline           # pastikan commit terbaru
+
+# Verifikasi MapLibre (teks Mapbox TIDAK boleh muncul)
+grep -n "maplibre\|Mapbox token" components/map/monitoring-map.tsx | head
+# harus ada maplibre; jika masih "Mapbox token" → path repo salah
+
+rm -rf fetrack .next           # bersihkan nested clone + build lama
+npm install --legacy-peer-deps # peerOptional nodemailer vs next-auth
 npx prisma generate
 npx prisma migrate deploy
-npm run build          # wajib sukses sebelum restart
-pm2 restart fetrack
+npm run build                  # WAJIB sukses (harus ada .next/BUILD_ID)
+test -f .next/BUILD_ID || { echo "BUILD GAGAL"; exit 1; }
+
+pm2 delete fetrack 2>/dev/null || true
+pm2 start npm --name fetrack -- start
+pm2 save
 pm2 logs fetrack --lines 30
 ```
 
 **Jangan** hapus `public/uploads/`.  
-**Jangan** `pm2 restart` jika `npm run build` gagal.
+**Jangan** `pm2 restart` jika `npm run build` gagal — itu yang bikin UI Mapbox lama tetap tampil.
 
 Setelah ubah `.env`:
 
