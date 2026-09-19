@@ -161,7 +161,7 @@ Outbound status → customer webhook; gagal setelah retry → **Webhook DLQ** (`
 
 ## 9. Checklist go-live
 
-Lihat juga checklist VPS lengkap: [DEPLOYMENT_VPS.md](./DEPLOYMENT_VPS.md).
+Lihat runbook operasional VPS: [DEPLOYMENT_VPS.md](./DEPLOYMENT_VPS.md) (domain, cron, backup, redeploy).
 
 - [ ] Ganti semua secret env (NextAuth, Cron, Webhook)
 - [ ] Hapus / ganti akun seed; buat admin production
@@ -212,7 +212,7 @@ docs/                # dokumentasi produk
 
 - [User Guide](./USER_GUIDE.md)
 - [Engagement Mitra/PKWT](./ENGAGEMENT.md)
-- [Deployment VPS](./DEPLOYMENT_VPS.md)
+- [Deployment & operasional VPS](./DEPLOYMENT_VPS.md)
 - [ERD](./ERD.md)
 - [Business Plan](./BUSINESS_PLAN.md)
 - Root [README.md](../README.md)

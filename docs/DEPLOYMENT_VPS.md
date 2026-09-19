@@ -1,86 +1,92 @@
-# FE-Track — Deployment di VPS
+# FE-Track — Deployment & Operasional VPS
 
-Panduan deploy production di VPS (Ubuntu 22.04/24.04 LTS).  
-Stack yang disarankan: **Docker (Postgres PostGIS + MinIO opsional)** · **Node 20** · **PM2** · **Nginx** · **Let's Encrypt**.
+Panduan **install** + **runbook harian** production.  
+Stack: **Docker PostGIS** · **Node 20** · **PM2** · **Nginx** · **Let's Encrypt** · **crontab**.
 
 Dokumen terkait: [MANUAL_GUIDE.md](./MANUAL_GUIDE.md) · [ENGAGEMENT.md](./ENGAGEMENT.md) · [README.md](../README.md)
 
 ---
 
-## 1. Arsitektur production
+## 0. Instance production (aktif)
+
+| Item | Nilai |
+|------|--------|
+| Domain | **https://klikhadir.site** |
+| App path | **`/opt/fetrack`** |
+| Process | PM2 name `fetrack` → `next start` `:3000` |
+| DB | Docker `fetrack-postgres` → host `127.0.0.1:5433` |
+| Backup | `/var/backups/fetrack` |
+| Cron log | `/home/ubuntu/fetrack-cron.log` |
+| Repo | `https://github.com/bionte4/femanager.git` |
+| Timezone | `Asia/Jakarta` (WIB) — set dengan `timedatectl` |
+
+**Jangan** expose `:3000` / `:5433` ke publik. Akses hanya lewat Nginx `:80`/`:443`.
+
+---
+
+## 1. Arsitektur
 
 ```
 Internet
    │
    ▼
-Nginx (:443 TLS)  ──►  Next.js PM2 (:3000)
-                           │
-                           ├── Prisma → Postgres PostGIS (Docker :5432 internal / :5433 host)
-                           ├── Foto lokal → public/uploads/  (persist volume)
-                           └── Cron (crontab) → https://domain/api/cron/*
+Nginx (:443 TLS)  klikhadir.site
+   │
+   ▼
+Next.js PM2 (:3000 loopback)
+   ├── Prisma → Postgres PostGIS (Docker, 127.0.0.1:5433)
+   ├── Foto → /opt/fetrack/public/uploads/
+   ├── Settings WA/SMTP/AI → DB app_settings (+ fallback .env)
+   └── crontab → https://klikhadir.site/api/cron/*
 ```
 
-| Komponen | Rekomendasi |
-|----------|-------------|
+| Komponen | Production |
+|----------|------------|
 | App | Next.js 14 (`npm run build` + `pm2`) |
-| DB | `postgis/postgis:15-3.4` via Docker |
-| Reverse proxy | Nginx + Certbot |
-| Process manager | PM2 |
-| Storage foto | Saat ini **filesystem** `public/uploads/` (backup wajib) |
-| WA / Mapbox / FCM | Opsional via env |
+| DB | `postgis/postgis:15-3.4` |
+| Proxy | Nginx + Certbot |
+| Process | PM2 (`fetrack`) |
+| Storage | `public/uploads/` (backup wajib) |
+| Channel | Fonnte / SMTP / AI via `/admin/integrations` atau `.env` |
 
 ---
 
 ## 2. Spesifikasi VPS minimum
 
-| Resource | Dev / soft-launch | Produksi (nasional) |
-|----------|-------------------|---------------------|
+| Resource | Soft-launch | Produksi |
+|----------|-------------|----------|
 | vCPU | 2 | 4+ |
 | RAM | 4 GB | 8 GB+ |
-| Disk | 40 GB SSD | 80 GB+ SSD |
+| Disk | 40 GB SSD | 80 GB+ |
 | OS | Ubuntu 22.04 / 24.04 LTS | sama |
-| Network | Public IP + domain A record | sama |
 
-Buka firewall: `22` (SSH), `80`, `443`. **Jangan** expose Postgres/MinIO ke publik.
+Firewall: `22`, `80`, `443` saja.
 
 ---
 
-## 3. Persiapan server
+## 3. Persiapan server (install baru)
 
 ```bash
-# Login sebagai user non-root dengan sudo
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y curl git ufw ca-certificates gnupg
-
-# Firewall
 sudo ufw allow OpenSSH
 sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
 sudo ufw enable
+
+# Timezone operasional Indonesia
+sudo timedatectl set-timezone Asia/Jakarta
+timedatectl
 ```
 
-### Node.js 20
+### Node 20 · Docker · PM2 · Nginx
 
 ```bash
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs
-node -v   # v20.x
-npm -v
-```
-
-### Docker + Compose
-
-```bash
 curl -fsSL https://get.docker.com | sudo sh
 sudo usermod -aG docker $USER
-# logout/login agar group docker aktif
-docker --version
-docker compose version
-```
-
-### PM2 & Nginx & Certbot
-
-```bash
+# logout/login atau: newgrp docker
 sudo npm install -g pm2
 sudo apt install -y nginx certbot python3-certbot-nginx
 ```
@@ -88,8 +94,6 @@ sudo apt install -y nginx certbot python3-certbot-nginx
 ---
 
 ## 4. Clone & environment
-
-App di **`/opt/fetrack`** (standar binary/service di Linux; backup tetap di `/var/backups`).
 
 ```bash
 sudo mkdir -p /opt/fetrack
@@ -99,7 +103,7 @@ git clone https://github.com/bionte4/femanager.git fetrack
 cd fetrack
 ```
 
-Buat `.env` production (jangan commit):
+> **Jangan** `git clone` lagi di dalam `/opt/fetrack` (hindari nested `/opt/fetrack/fetrack` yang merusak `next build`).
 
 ```bash
 cp .env.example .env
@@ -109,48 +113,35 @@ nano .env
 ### Env production (wajib)
 
 ```env
-# DB — host dari container (lihat docker-compose di bawah)
 DATABASE_URL="postgresql://postgres:GANTI_PASSWORD_KUAT@127.0.0.1:5433/fetrack?schema=public"
 
-# Auth — URL harus HTTPS domain production
-NEXTAUTH_URL="https://app.contoh.com"
-AUTH_SECRET="GANTI_dengan_openssl_rand_hex_32"
+NEXTAUTH_URL="https://klikhadir.site"
+AUTH_SECRET="GANTI_openssl_rand_hex_32"
 NEXTAUTH_SECRET="sama_dengan_AUTH_SECRET"
 
-# Cron & webhook — fail-closed tanpa secret
 CRON_SECRET="GANTI_cron_secret_panjang"
 MONITORING_WEBHOOK_SECRET="GANTI_webhook_secret"
 
-# Opsional
 NEXT_PUBLIC_MAPBOX_TOKEN=""
 FONNTE_TOKEN=""
 ADMIN_WHATSAPP="628xxxxxxxxxx"
 STOP_CLOCK_APPROVAL_HOURS="2"
-
-# FCM (opsional)
-FCM_SERVER_KEY=""
-NEXT_PUBLIC_FIREBASE_API_KEY=""
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=""
-NEXT_PUBLIC_FIREBASE_APP_ID=""
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=""
-NEXT_PUBLIC_FIREBASE_VAPID_KEY=""
 ```
-
-Generate secret:
 
 ```bash
-openssl rand -hex 32
+openssl rand -hex 32   # AUTH / CRON / webhook
+openssl rand -base64 24  # password DB disarankan
 ```
+
+`NEXTAUTH_URL` **harus** sama dengan URL browser (HTTPS domain). Salah → login loop / CSS rusak setelah logout.
+
+WA / SMTP / AI juga bisa diisi di UI **`/admin/integrations`** (override DB, fallback `.env`).
 
 ---
 
 ## 5. Database (Docker PostGIS)
 
-Di VPS, **jangan** publish Postgres ke internet. Gunakan `docker-compose.prod.yml` minimal:
-
-```bash
-nano docker-compose.prod.yml
-```
+`docker-compose.prod.yml`:
 
 ```yaml
 services:
@@ -176,100 +167,83 @@ volumes:
   postgres_data:
 ```
 
-Jalankan:
-
 ```bash
 docker compose -f docker-compose.prod.yml up -d
-docker compose -f docker-compose.prod.yml ps
 ```
 
-> Password di compose **harus sama** dengan `DATABASE_URL`.
+Password compose **=** password di `DATABASE_URL`.  
+Volume lama **tidak** ikut ganti password kalau hanya edit compose — pakai `ALTER USER` atau `down -v` (data hilang).
+
+Uji TCP (bukan `docker exec` socket lokal):
+
+```bash
+PASS='password_dari_DATABASE_URL'
+docker run --rm --network host -e PGPASSWORD="$PASS" postgres:15 \
+  psql -h 127.0.0.1 -p 5433 -U postgres -d fetrack -c 'SELECT 1;'
+```
+
+Samakan password jika gagal:
+
+```bash
+docker exec -it fetrack-postgres \
+  psql -U postgres -c "ALTER USER postgres WITH PASSWORD '$PASS';"
+```
 
 ---
 
-## 6. Install app, migrate, build
+## 6. Install, migrate, build, admin
 
 ```bash
 cd /opt/fetrack
+rm -rf fetrack   # bersihkan nested clone jika ada
 npm ci
 npx prisma generate
 npx prisma migrate deploy
-
-# Seed HANYA untuk staging/demo — JANGAN di production live
-# npx prisma db seed
-
+# JANGAN: npx prisma db seed   (production)
 npm run build
-```
 
-Buat folder upload persistent:
-
-```bash
 mkdir -p public/uploads/tickets public/uploads/candidates
 chmod -R u+rwX public/uploads
 ```
 
-Buat user admin production lewat Prisma Studio / SQL / script — **ganti password seed** jika sempat seed di staging.
+### Buat Super Admin (tanpa seed)
+
+```bash
+cd /opt/fetrack
+ADMIN_PHONE='081234567890' \
+ADMIN_PASS='PASSWORD_KUAT_MIN_8' \
+ADMIN_NAME='Admin Produksi' \
+npx tsx scripts/create-admin.ts
+```
+
+Login: `https://klikhadir.site/login` → phone + password di atas.
 
 ---
 
-## 7. Jalankan dengan PM2
+## 7. PM2
 
 ```bash
 cd /opt/fetrack
 pm2 start npm --name fetrack -- start
 pm2 save
 pm2 startup
-# ikuti perintah yang ditampilkan (sudo env PATH=...)
-```
+# jalankan perintah sudo yang ditampilkan PM2
 
-Cek:
-
-```bash
-pm2 status
-pm2 logs fetrack --lines 50
 curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:3000/login
-```
-
-### File ecosystem (opsional)
-
-`ecosystem.config.cjs`:
-
-```js
-module.exports = {
-  apps: [
-    {
-      name: "fetrack",
-      cwd: "/opt/fetrack",
-      script: "node_modules/next/dist/bin/next",
-      args: "start -p 3000",
-      instances: 1,
-      exec_mode: "fork",
-      env: {
-        NODE_ENV: "production",
-      },
-      max_memory_restart: "1G",
-    },
-  ],
-};
-```
-
-```bash
-pm2 start ecosystem.config.cjs
-pm2 save
+# harapan: 200
 ```
 
 ---
 
-## 8. Nginx + HTTPS
+## 8. Nginx + HTTPS (klikhadir.site)
 
-```bash
-sudo nano /etc/nginx/sites-available/fetrack
-```
+DNS: A record `@` / `www` → IP VPS.
 
 ```nginx
+# /etc/nginx/sites-available/fetrack
 server {
     listen 80;
-    server_name app.contoh.com;
+    server_name klikhadir.site www.klikhadir.site;
 
     client_max_body_size 25M;
 
@@ -289,180 +263,228 @@ server {
 
 ```bash
 sudo ln -sf /etc/nginx/sites-available/fetrack /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl reload nginx
-
-# Pastikan DNS A record domain → IP VPS sudah aktif
-sudo certbot --nginx -d app.contoh.com
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot --nginx -d klikhadir.site -d www.klikhadir.site
 ```
 
-Setelah SSL, pastikan `NEXTAUTH_URL=https://app.contoh.com` lalu:
+Pastikan `.env` → `NEXTAUTH_URL="https://klikhadir.site"` lalu `pm2 restart fetrack`.
+
+---
+
+## 9. Crontab (operasional)
+
+Auth: header `Authorization: Bearer <CRON_SECRET>` (sama dengan `.env`).  
+**Jangan** buka `/api/cron/*` di browser.
 
 ```bash
-pm2 restart fetrack
+SECRET=$(grep '^CRON_SECRET=' /opt/fetrack/.env | cut -d= -f2- | tr -d '"' | tr -d "'")
+
+# uji
+curl -s -w "\nHTTP:%{http_code}\n" \
+  -H "Authorization: Bearer ${SECRET}" \
+  "https://klikhadir.site/api/cron/check-dispatch"
+```
+
+Pasang:
+
+```bash
+SECRET=$(grep '^CRON_SECRET=' /opt/fetrack/.env | cut -d= -f2- | tr -d '"' | tr -d "'")
+
+crontab - <<EOF
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+* * * * * curl -fsS -H "Authorization: Bearer ${SECRET}" "https://klikhadir.site/api/cron/check-dispatch" >>/home/ubuntu/fetrack-cron.log 2>&1
+*/5 * * * * curl -fsS -H "Authorization: Bearer ${SECRET}" "https://klikhadir.site/api/cron/webhook-dlq" >>/home/ubuntu/fetrack-cron.log 2>&1
+0 2 * * * curl -fsS -H "Authorization: Bearer ${SECRET}" "https://klikhadir.site/api/cron/expire-contracts" >>/home/ubuntu/fetrack-cron.log 2>&1
+0 9 * * * curl -fsS -H "Authorization: Bearer ${SECRET}" "https://klikhadir.site/api/cron/remind-contracts" >>/home/ubuntu/fetrack-cron.log 2>&1
+0 10 * * * curl -fsS -H "Authorization: Bearer ${SECRET}" "https://klikhadir.site/api/cron/remind-candidates" >>/home/ubuntu/fetrack-cron.log 2>&1
+0 3 * * * /usr/local/bin/fetrack-backup.sh >>/var/backups/fetrack/backup.log 2>&1
+EOF
+
+touch /home/ubuntu/fetrack-cron.log
+crontab -l | sed 's/Bearer .*/Bearer ***/'
+```
+
+| Jadwal (WIB) | Endpoint | Fungsi |
+|--------------|----------|--------|
+| tiap 1 menit | `check-dispatch` | timeout accept / re-dispatch |
+| tiap 5 menit | `webhook-dlq` | retry webhook |
+| 02:00 | `expire-contracts` | PKWT expired |
+| 09:00 | `remind-contracts` | reminder WA kontrak |
+| 10:00 | `remind-candidates` | kandidat stale |
+| 03:00 | backup script | DB + uploads |
+
+```bash
+tail -n 30 /home/ubuntu/fetrack-cron.log
 ```
 
 ---
 
-## 9. Cron production
-
-Auth: `Authorization: Bearer <CRON_SECRET>`
+## 10. Backup (operasional)
 
 ```bash
-crontab -e
-```
+sudo mkdir -p /var/backups/fetrack
+sudo chown $USER:$USER /var/backups/fetrack
 
-```cron
-# FE-Track — ganti DOMAIN dan CRON_SECRET
-* * * * * curl -fsS -H "Authorization: Bearer CRON_SECRET" "https://app.contoh.com/api/cron/check-dispatch" >/dev/null 2>&1
-*/5 * * * * curl -fsS -H "Authorization: Bearer CRON_SECRET" "https://app.contoh.com/api/cron/webhook-dlq" >/dev/null 2>&1
-0 2 * * * curl -fsS -H "Authorization: Bearer CRON_SECRET" "https://app.contoh.com/api/cron/expire-contracts" >/dev/null 2>&1
-0 9 * * * curl -fsS -H "Authorization: Bearer CRON_SECRET" "https://app.contoh.com/api/cron/remind-contracts" >/dev/null 2>&1
-0 10 * * * curl -fsS -H "Authorization: Bearer CRON_SECRET" "https://app.contoh.com/api/cron/remind-candidates" >/dev/null 2>&1
-```
-
-Uji manual:
-
-```bash
-curl -s -H "Authorization: Bearer $CRON_SECRET" "https://app.contoh.com/api/cron/check-dispatch"
-```
-
----
-
-## 10. Backup
-
-### Postgres (harian)
-
-```bash
-mkdir -p /var/backups/fetrack
-nano /usr/local/bin/fetrack-backup.sh
-```
-
-```bash
+sudo tee /usr/local/bin/fetrack-backup.sh >/dev/null <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 STAMP=$(date +%Y%m%d_%H%M)
 DIR=/var/backups/fetrack
 mkdir -p "$DIR"
+
 docker exec fetrack-postgres pg_dump -U postgres -d fetrack -Fc \
   > "$DIR/fetrack_$STAMP.dump"
-# Upload lokal (persist foto)
-tar -czf "$DIR/uploads_$STAMP.tgz" -C /opt/fetrack/public uploads
-# Retensi 14 hari
+
+if [ -d /opt/fetrack/public/uploads ]; then
+  tar -czf "$DIR/uploads_$STAMP.tgz" -C /opt/fetrack/public uploads
+fi
+
 find "$DIR" -type f -mtime +14 -delete
-```
+echo "[$(date -Is)] backup ok: fetrack_$STAMP.dump" >> "$DIR/backup.log"
+EOF
 
-```bash
 sudo chmod +x /usr/local/bin/fetrack-backup.sh
-# crontab root atau user:
-0 3 * * * /usr/local/bin/fetrack-backup.sh
+/usr/local/bin/fetrack-backup.sh
+ls -lh /var/backups/fetrack/
 ```
 
-Restore contoh:
+Restore:
 
 ```bash
-docker exec -i fetrack-postgres pg_restore -U postgres -d fetrack --clean --if-exists < fetrack_YYYYMMDD.dump
+docker exec -i fetrack-postgres pg_restore -U postgres -d fetrack --clean --if-exists \
+  < /var/backups/fetrack/fetrack_YYYYMMDD_HHMM.dump
 ```
+
+Disarankan copy dump ke storage luar (bukan hanya disk VPS yang sama).
 
 ---
 
-## 11. Update / redeploy
+## 11. Runbook harian / kejadian
+
+### Status cepat
+
+```bash
+pm2 status
+docker compose -f /opt/fetrack/docker-compose.prod.yml ps
+curl -s -o /dev/null -w "%{http_code}\n" https://klikhadir.site/login
+tail -n 20 /home/ubuntu/fetrack-cron.log
+ls -lt /var/backups/fetrack | head
+```
+
+### Redeploy (update kode)
 
 ```bash
 cd /opt/fetrack
 git pull origin main
+rm -rf fetrack   # jika sempat nested clone
 npm ci
 npx prisma generate
 npx prisma migrate deploy
-npm run build
+npm run build          # wajib sukses sebelum restart
 pm2 restart fetrack
 pm2 logs fetrack --lines 30
 ```
 
-**Jangan** hapus `public/uploads/` saat deploy.  
-Jika build gagal, PM2 masih menjalankan build lama sampai `restart` sukses.
+**Jangan** hapus `public/uploads/`.  
+**Jangan** `pm2 restart` jika `npm run build` gagal.
 
-Zero-downtime ringan (opsional):
+Setelah ubah `.env`:
 
 ```bash
-npm run build && pm2 reload fetrack
+pm2 restart fetrack --update-env
 ```
 
----
-
-## 12. Checklist go-live VPS
-
-- [ ] DNS A record mengarah ke VPS
-- [ ] HTTPS aktif (`certbot`)
-- [ ] `NEXTAUTH_URL` = `https://...` (bukan localhost)
-- [ ] Secret kuat: `AUTH_SECRET`, `CRON_SECRET`, `MONITORING_WEBHOOK_SECRET`, DB password
-- [ ] Postgres hanya bind `127.0.0.1`
-- [ ] `migrate deploy` sukses; **tanpa** seed production (atau ganti semua password)
-- [ ] PM2 `startup` + `save`
-- [ ] Crontab 4–5 job cron jalan
-- [ ] Backup DB + `uploads` terjadwal
-- [ ] UFW: 22/80/443 saja
-- [ ] Uji login admin + engineer, upload foto, assign ticket, cron 200
-- [ ] Inbox HR kontrak + payroll Mitra dicek
-
----
-
-## 13. Troubleshooting VPS
-
-| Gejala | Cek |
-|--------|-----|
-| 502 Bad Gateway | `pm2 status`; app listen `:3000`; `nginx -t` |
-| Login loop / session hilang | `NEXTAUTH_URL` harus HTTPS domain yang sama; cookie Secure |
-| Prisma error / table missing | `npx prisma migrate deploy` |
-| Cron 401 | `CRON_SECRET` di `.env` vs crontab tidak match; restart PM2 setelah ubah env |
-| Foto hilang setelah deploy | `public/uploads` terhapus — restore dari backup |
-| Disk penuh | `du -sh public/uploads /var/lib/docker`; bersihkan backup lama |
-| OOM / restart | Naikkan RAM atau `max_memory_restart`; cek `pm2 monit` |
-| WA tidak kirim | `FONNTE_TOKEN` kosong = skip (lihat log); set token lalu restart |
-
-Log berguna:
+### Reset password admin
 
 ```bash
-pm2 logs fetrack
+ADMIN_PHONE='081234567890' ADMIN_PASS='PASSWORD_BARU' \
+  npx tsx scripts/create-admin.ts
+```
+
+### Integrasi channel
+
+UI: `https://klikhadir.site/admin/integrations` (kartu WA / SMTP / AI + Customer Open API).
+
+---
+
+## 12. Checklist go-live / audit
+
+- [ ] DNS → VPS; HTTPS Certbot aktif
+- [ ] `NEXTAUTH_URL=https://klikhadir.site`
+- [ ] Secret kuat (AUTH, CRON, webhook, DB)
+- [ ] Postgres bind `127.0.0.1` saja
+- [ ] `migrate deploy` OK; **tanpa** seed production
+- [ ] Super Admin via `scripts/create-admin.ts`
+- [ ] PM2 `startup` + `save`
+- [ ] Crontab 5 job + backup 03:00
+- [ ] Timezone `Asia/Jakarta`
+- [ ] UFW 22/80/443
+- [ ] Smoke: login, logout → `/login`, ticket, upload, cron HTTP 200
+- [ ] Tidak ada nested `/opt/fetrack/fetrack`
+
+---
+
+## 13. Troubleshooting operasional
+
+| Gejala | Perbaikan |
+|--------|-----------|
+| Nginx 404 di `:3000` publik | Jangan expose 3000; pakai `https://klikhadir.site` via Nginx |
+| 502 Bad Gateway | `pm2 status`; app di `:3000`; `nginx -t` |
+| Login loop / session hilang | Samakan `NEXTAUTH_URL` dengan URL browser; restart PM2 |
+| Logout tampilan tanpa CSS | Hard redirect sudah di kode terbaru; pull + rebuild; cek `NEXTAUTH_URL` |
+| Prisma P1000 auth failed | Password `.env` ≠ volume Docker; `ALTER USER` atau reset volume |
+| `prisma.appSetting` undefined / hang | `npx prisma generate` + **restart** `pm2` (bukan HMR) |
+| Build `./fetrack/lib/...` | Hapus nested `rm -rf /opt/fetrack/fetrack` |
+| Build REJECT_REASONS / use server | Pastikan pull commit terbaru |
+| Cron 401 | Secret crontab ≠ `.env`; jangan pakai placeholder; `pm2 restart` setelah ubah env |
+| Cron log kosong | `crontab -l`; `touch` log; tunggu 1 menit; cek `curl` manual |
+| Docker permission denied | `sudo usermod -aG docker $USER` lalu `newgrp docker` |
+| Foto hilang | Restore `uploads_*.tgz`; jangan hapus `public/uploads` saat deploy |
+| WA tidak kirim | Token kosong / disabled di Integrations; cek log PM2 |
+
+Log:
+
+```bash
+pm2 logs fetrack --lines 80
 sudo journalctl -u nginx -n 50
 docker logs fetrack-postgres --tail 50
+tail -n 50 /home/ubuntu/fetrack-cron.log
+tail -n 20 /var/backups/fetrack/backup.log
 ```
 
 ---
 
-## 14. Keamanan singkat
+## 14. Keamanan
 
-1. SSH key-only; disable password login jika memungkinkan.
+1. SSH key-only bila memungkinkan.
 2. Jangan commit `.env`.
-3. Jangan buka port `5433` / `9000` ke `0.0.0.0`.
-4. Ganti semua kredensial seed sebelum traffic nyata.
-5. Batasi akses `/admin` dengan VPN atau IP allowlist (opsional di Nginx).
-
-Contoh allowlist admin (opsional):
-
-```nginx
-location /admin {
-    # allow 203.0.113.10;
-    # deny all;
-    proxy_pass http://127.0.0.1:3000;
-    # ... header sama seperti di atas
-}
-```
+3. Jangan buka `5433` / `9000` ke `0.0.0.0`.
+4. Jangan seed production; buat admin dengan password kuat.
+5. Opsional: IP allowlist untuk `/admin` di Nginx.
+6. Jangan upgrade Prisma major (5 → 8) tanpa rencana migrasi.
 
 ---
 
-## 15. Referensi cepat perintah
+## 15. Referensi cepat
 
 ```bash
 # Status
-pm2 status && docker compose -f docker-compose.prod.yml ps
+pm2 status
+docker ps --filter name=fetrack-postgres
+curl -s -o /dev/null -w "%{http_code}\n" https://klikhadir.site/login
 
-# Restart app
+# Restart
 pm2 restart fetrack
 
-# Migrate setelah pull
-npx prisma migrate deploy && npm run build && pm2 restart fetrack
+# Deploy singkat (setelah pull)
+cd /opt/fetrack && npx prisma migrate deploy && npm run build && pm2 restart fetrack
 
-# SSL renew (biasanya auto via certbot timer)
+# SSL renew dry-run
 sudo certbot renew --dry-run
+
+# Backup manual
+/usr/local/bin/fetrack-backup.sh
 ```
