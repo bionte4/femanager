@@ -16,17 +16,6 @@ import {
   eligibilityMessage,
 } from "@/lib/eligibility";
 
-const REJECT_REASONS = [
-  "Jauh dari lokasi",
-  "Ada kerjaan lain",
-  "Sakit / tidak fit",
-  "Cuaca buruk",
-  "Alat tidak lengkap",
-  "Lainnya",
-] as const;
-
-export { REJECT_REASONS };
-
 async function requireEligibleEngineer() {
   const session = await auth();
   if (!session?.user) throw new Error("Unauthorized");

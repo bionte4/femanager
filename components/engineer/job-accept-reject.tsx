@@ -6,8 +6,8 @@ import { toast } from "sonner";
 import {
   acceptJobAction,
   rejectJobAction,
-  REJECT_REASONS,
 } from "@/app/actions/job-response";
+import { REJECT_REASONS } from "@/lib/job-reject-reasons";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
