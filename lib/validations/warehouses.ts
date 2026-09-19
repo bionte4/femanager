@@ -1,13 +1,18 @@
 import { z } from "zod";
+import {
+  WAREHOUSE_CODE_ERROR,
+  WAREHOUSE_CODE_REGEX,
+  normalizeCode,
+} from "@/lib/code-conventions";
 
 export const warehouseSchema = z.object({
   code: z
     .string()
     .min(2, "Kode minimal 2 karakter")
-    .max(32)
-    .transform((v) => v.trim().toUpperCase())
-    .refine((v) => /^[A-Z0-9_-]+$/.test(v), {
-      message: "Kode hanya huruf/angka/_/-",
+    .max(6)
+    .transform((v) => normalizeCode(v))
+    .refine((v) => WAREHOUSE_CODE_REGEX.test(v), {
+      message: WAREHOUSE_CODE_ERROR,
     }),
   name: z.string().min(2, "Nama minimal 2 karakter").max(120),
   city: z

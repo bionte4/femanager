@@ -120,7 +120,7 @@ function demoBirthDate(opts: {
 
 const TENANTS = [
   {
-    code: "DEMO-JKTS01",
+    code: "DEMO-JKT-001",
     name: "Toko Demo Menteng",
     address: "Jl. Menteng Raya No. 1",
     province: "DKI Jakarta",
@@ -131,7 +131,7 @@ const TENANTS = [
     sla_tier: SlaTier.TIER1_JABODETABEK,
   },
   {
-    code: "DEMO-JKTS02",
+    code: "DEMO-JKT-002",
     name: "Toko Demo Kebayoran",
     address: "Jl. Melawai No. 10",
     province: "DKI Jakarta",
@@ -142,7 +142,7 @@ const TENANTS = [
     sla_tier: SlaTier.TIER1_JABODETABEK,
   },
   {
-    code: "DEMO-BKS01",
+    code: "DEMO-BKS-001",
     name: "Toko Demo Bekasi Barat",
     address: "Jl. Ahmad Yani No. 5",
     province: "Jawa Barat",
@@ -153,7 +153,7 @@ const TENANTS = [
     sla_tier: SlaTier.TIER1_JABODETABEK,
   },
   {
-    code: "DEMO-DPK01",
+    code: "DEMO-DPK-001",
     name: "Toko Demo Depok",
     address: "Jl. Margonda Raya No. 20",
     province: "Jawa Barat",
@@ -164,7 +164,7 @@ const TENANTS = [
     sla_tier: SlaTier.TIER1_JABODETABEK,
   },
   {
-    code: "DEMO-TNG01",
+    code: "DEMO-TNG-001",
     name: "Toko Demo Tangerang",
     address: "Jl. MH Thamrin No. 8",
     province: "Banten",

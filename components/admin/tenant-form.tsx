@@ -96,11 +96,15 @@ export function TenantForm({ initial, onSuccess }: TenantFormProps) {
           <Label htmlFor="code">Kode</Label>
           <Input
             id="code"
-            placeholder="ALF-JKT-021"
+            placeholder="BRI-JKT-001"
+            className="font-mono uppercase"
             {...register("code", {
               setValueAs: (v: string) => v?.toUpperCase?.() ?? v,
             })}
           />
+          <p className="text-[11px] text-muted-foreground">
+            Format: CLIENT-CITY-### · contoh BRI-JKT-001
+          </p>
           {errors.code && (
             <p className="text-xs text-destructive">{errors.code.message}</p>
           )}

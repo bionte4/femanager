@@ -1,5 +1,10 @@
 import { z } from "zod";
 import type { ExcelPreviewAction } from "@/lib/excel";
+import {
+  TENANT_CODE_ERROR,
+  TENANT_CODE_REGEX,
+  normalizeCode,
+} from "@/lib/code-conventions";
 
 export const DEVICE_EXCEL_HEADERS = [
   "serial_number",
@@ -17,9 +22,10 @@ export const deviceExcelRowSchema = z.object({
   serial_number: z.string().min(3).max(120).transform((v) => v.trim()),
   tenant_code: z
     .string()
-    .min(3)
-    .max(32)
-    .transform((v) => v.trim().toUpperCase()),
+    .min(8)
+    .max(16)
+    .transform((v) => normalizeCode(v))
+    .refine((v) => TENANT_CODE_REGEX.test(v), TENANT_CODE_ERROR),
   type: z
     .string()
     .transform((v) => v.trim().toUpperCase())
@@ -69,7 +75,7 @@ export type DevicePreviewRow = {
 
 export const DEVICE_SAMPLE_ROW = {
   serial_number: "SN-DEMO-001",
-  tenant_code: "DEMO-JKTS01",
+  tenant_code: "DEMO-JKT-001",
   type: "EDC_BCA",
   device_category: "EDC",
   brand: "Ingenico",

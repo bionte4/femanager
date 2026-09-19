@@ -291,10 +291,17 @@ export function SparepartsTable({
               <Input
                 value={form.sku}
                 onChange={(e) =>
-                  setForm((f) => ({ ...f, sku: e.target.value }))
+                  setForm((f) => ({
+                    ...f,
+                    sku: e.target.value.toUpperCase(),
+                  }))
                 }
-                placeholder="EDC-BCA-01"
+                placeholder="EDC-BCA-ICT250"
+                className="font-mono uppercase"
               />
+              <p className="text-[11px] text-muted-foreground">
+                Format: CAT-BRAND-MODEL · EDC / RTR / SW / CBL / PWR / SIM / ANT
+              </p>
             </div>
             <div className="space-y-1.5">
               <Label>Stok</Label>

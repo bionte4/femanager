@@ -1,4 +1,9 @@
 import { z } from "zod";
+import {
+  TENANT_CODE_ERROR,
+  TENANT_CODE_REGEX,
+  normalizeCode,
+} from "@/lib/code-conventions";
 
 export const slaTierEnum = z.enum([
   "TIER1_JABODETABEK",
@@ -40,9 +45,12 @@ export const tenantSchema = z.object({
   name: z.string().min(2, "Nama minimal 2 karakter"),
   code: z
     .string()
-    .min(3, "Kode minimal 3 karakter")
-    .max(32)
-    .regex(/^[A-Z0-9-]+$/, "Kode hanya huruf besar, angka, dan -"),
+    .min(8, "Kode terlalu pendek")
+    .max(16)
+    .transform((v) => normalizeCode(v))
+    .refine((v) => TENANT_CODE_REGEX.test(v), {
+      message: TENANT_CODE_ERROR,
+    }),
   address: z.string().min(5, "Alamat wajib diisi"),
   province: z.string().min(2, "Provinsi wajib"),
   city: z.string().min(2, "Kota wajib"),

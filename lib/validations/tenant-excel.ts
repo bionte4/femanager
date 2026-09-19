@@ -1,5 +1,10 @@
 import { z } from "zod";
 import type { ExcelPreviewAction } from "@/lib/excel";
+import {
+  TENANT_CODE_ERROR,
+  TENANT_CODE_REGEX,
+  normalizeCode,
+} from "@/lib/code-conventions";
 
 export const TENANT_EXCEL_HEADERS = [
   "code",
@@ -20,10 +25,10 @@ export const TENANT_EXCEL_HEADERS = [
 export const tenantExcelRowSchema = z.object({
   code: z
     .string()
-    .min(3)
-    .max(32)
-    .transform((v) => v.trim().toUpperCase())
-    .refine((v) => /^[A-Z0-9-]+$/.test(v), "Kode hanya A-Z, 0-9, -"),
+    .min(8)
+    .max(16)
+    .transform((v) => normalizeCode(v))
+    .refine((v) => TENANT_CODE_REGEX.test(v), TENANT_CODE_ERROR),
   name: z.string().min(2).max(200),
   address: z.string().min(5).max(500),
   province: z.string().min(2).max(100),
@@ -58,7 +63,7 @@ export type TenantPreviewRow = {
 };
 
 export const TENANT_SAMPLE_ROW = {
-  code: "DEMO-JKTS99",
+  code: "DEMO-JKT-099",
   name: "Toko Contoh Excel",
   address: "Jl. Contoh No. 1",
   province: "DKI Jakarta",

@@ -192,9 +192,13 @@ export function WarehousesTable({ items }: { items: WarehouseRow[] }) {
                 onChange={(e) =>
                   setForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))
                 }
-                placeholder="JKT / BDG / SBY"
+                placeholder="JKT / BDG / HQ"
                 className="font-mono uppercase"
+                maxLength={6}
               />
+              <p className="text-[11px] text-muted-foreground">
+                Format: 2–4 huruf (+opsional digit). Contoh: HQ, JKT, BDG, JKT2
+              </p>
             </div>
             <div className="space-y-1.5">
               <Label>Nama</Label>

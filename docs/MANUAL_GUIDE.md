@@ -209,6 +209,7 @@ docs/                # dokumentasi produk
 ## 12. Referensi
 
 - [User Guide](./USER_GUIDE.md)
+- [Standard Kode](./CODE_CONVENTIONS.md)
 - [Engagement Mitra/PKWT](./ENGAGEMENT.md)
 - [Deployment & operasional VPS](./DEPLOYMENT_VPS.md)
 - [ERD](./ERD.md)

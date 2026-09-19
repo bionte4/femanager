@@ -1,9 +1,19 @@
 import { z } from "zod";
+import {
+  SKU_ERROR,
+  SKU_REGEX,
+  normalizeCode,
+} from "@/lib/code-conventions";
 
 export const sparepartSchema = z
   .object({
     name: z.string().min(2, "Nama minimal 2 karakter"),
-    sku: z.string().min(2, "SKU minimal 2 karakter"),
+    sku: z
+      .string()
+      .min(5, "SKU terlalu pendek")
+      .max(64)
+      .transform((v) => normalizeCode(v))
+      .refine((v) => SKU_REGEX.test(v), { message: SKU_ERROR }),
     stock_qty: z.coerce.number().int().min(0),
     location_type: z.enum(["WAREHOUSE", "ENGINEER"]),
     warehouse_id: z.string().optional().nullable(),
