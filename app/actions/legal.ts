@@ -185,8 +185,54 @@ export async function signPartnershipAgreementAction(input: {
   }
 }
 
+export async function seedDefaultAgreementIfMissing() {
+  const count = await prisma.partnershipAgreement.count();
+  if (count > 0) {
+    // Pastikan ada minimal 1 yang aktif
+    const active = await prisma.partnershipAgreement.findFirst({
+      where: { is_active: true },
+    });
+    if (active) return active;
+    const any = await prisma.partnershipAgreement.findFirst({
+      orderBy: { created_at: "desc" },
+    });
+    if (any) {
+      return prisma.partnershipAgreement.update({
+        where: { id: any.id },
+        data: { is_active: true },
+      });
+    }
+  }
+
+  const existing = await prisma.partnershipAgreement.findFirst({
+    where: { version: AGREEMENT_VERSION },
+  });
+  if (existing) {
+    await prisma.partnershipAgreement.updateMany({ data: { is_active: false } });
+    return prisma.partnershipAgreement.update({
+      where: { id: existing.id },
+      data: {
+        title: AGREEMENT_TITLE,
+        content_html: PARTNERSHIP_AGREEMENT_V1_HTML,
+        is_active: true,
+      },
+    });
+  }
+
+  await prisma.partnershipAgreement.updateMany({ data: { is_active: false } });
+  return prisma.partnershipAgreement.create({
+    data: {
+      version: AGREEMENT_VERSION,
+      title: AGREEMENT_TITLE,
+      content_html: PARTNERSHIP_AGREEMENT_V1_HTML,
+      is_active: true,
+    },
+  });
+}
+
 export async function listPartnershipAgreements() {
   await requireAdmin();
+  await seedDefaultAgreementIfMissing();
   return prisma.partnershipAgreement.findMany({
     orderBy: { created_at: "desc" },
     include: { _count: { select: { engineer_agreements: true } } },
@@ -409,23 +455,6 @@ export async function getComplianceDashboard() {
     })),
     unsignedWithJobs,
   };
-}
-
-export async function seedDefaultAgreementIfMissing() {
-  const existing = await prisma.partnershipAgreement.findFirst({
-    where: { version: AGREEMENT_VERSION },
-  });
-  if (existing) return existing;
-
-  await prisma.partnershipAgreement.updateMany({ data: { is_active: false } });
-  return prisma.partnershipAgreement.create({
-    data: {
-      version: AGREEMENT_VERSION,
-      title: AGREEMENT_TITLE,
-      content_html: PARTNERSHIP_AGREEMENT_V1_HTML,
-      is_active: true,
-    },
-  });
 }
 
 export async function logCompliance(input: {
