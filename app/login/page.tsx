@@ -44,7 +44,8 @@ export default async function LoginPage() {
               FE-Track
             </p>
             <p className="mt-1.5 max-w-sm text-sm leading-snug text-emerald-100/70 sm:text-[15px]">
-              Platform penugasan field engineer untuk pemenuhan SLA se-Indonesia.
+              Kelola field engineer secara terpusat. SLA terukur, operasional
+              terkendali.
             </p>
           </div>
 
