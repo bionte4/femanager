@@ -217,6 +217,8 @@ model User {
   /// ["motorcycle", "toolkit", "laptop", "bor", "tangga", "car"]
   tools_owned    Json?
   can_work_for_others Boolean  @default(true)
+  /// Chat ID Telegram untuk notifikasi / OTP (opsional, gratis)
+  telegram_chat_id String?
   created_at    DateTime       @default(now())
   updated_at    DateTime       @updatedAt
 

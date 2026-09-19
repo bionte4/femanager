@@ -173,18 +173,18 @@ export async function remindExpiringContracts(
   }
 
   let remindedAdmin = false;
-  const { getAdminWhatsAppPhone } = await import("@/lib/whatsapp");
-  const adminPhone = await getAdminWhatsAppPhone();
-  if (adminPhone && matched.length > 0) {
+  if (matched.length > 0) {
     const lines = matched
       .slice(0, 15)
       .map((m) => `${m.full_name} (${m.days}h)`)
       .join(", ");
-    const res = await sendWhatsApp({
-      phone: adminPhone,
-      message: `FE-Track: ${matched.length} kontrak PKWT hampir expired (hari 30/14/7/3). ${lines}. Cek /admin/hr/contracts`,
-    });
-    remindedAdmin = res.success;
+    const { notifyAdmin } = await import("@/lib/notify");
+    const res = await notifyAdmin(
+      `FE-Track: ${matched.length} kontrak PKWT hampir expired (hari 30/14/7/3). ${lines}. Cek /admin/hr/contracts`
+    );
+    remindedAdmin =
+      (res.whatsapp.success && !res.whatsapp.skipped) ||
+      (res.telegram.success && !res.telegram.skipped);
   }
 
   return {

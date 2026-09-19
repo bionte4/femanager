@@ -6,9 +6,11 @@ import { toast } from "sonner";
 import {
   saveAiSettingsAction,
   saveSmtpSettingsAction,
+  saveTelegramSettingsAction,
   saveWhatsappSettingsAction,
   testAiAction,
   testSmtpAction,
+  testTelegramAction,
   testWhatsappAction,
   type IntegrationsPublicConfig,
 } from "@/app/actions/settings-integrations";
@@ -29,6 +31,10 @@ export function IntegrationsSettingsClient({
   const [waEnabled, setWaEnabled] = useState(initial.whatsapp.enabled);
   const [waAdmin, setWaAdmin] = useState(initial.whatsapp.admin_phone);
   const [waToken, setWaToken] = useState("");
+
+  const [tgEnabled, setTgEnabled] = useState(initial.telegram.enabled);
+  const [tgChat, setTgChat] = useState(initial.telegram.admin_chat_id);
+  const [tgToken, setTgToken] = useState("");
 
   const [smtpEnabled, setSmtpEnabled] = useState(initial.smtp.enabled);
   const [smtpHost, setSmtpHost] = useState(initial.smtp.host);
@@ -56,6 +62,20 @@ export function IntegrationsSettingsClient({
     if (!res.success) return toast.error(res.error);
     toast.success("WhatsApp disimpan");
     setWaToken("");
+    router.refresh();
+  }
+
+  async function saveTg() {
+    setBusy("tg-save");
+    const res = await saveTelegramSettingsAction({
+      enabled: tgEnabled,
+      admin_chat_id: tgChat,
+      bot_token: tgToken || undefined,
+    });
+    setBusy(null);
+    if (!res.success) return toast.error(res.error);
+    toast.success("Telegram disimpan");
+    setTgToken("");
     router.refresh();
   }
 
@@ -158,6 +178,79 @@ export function IntegrationsSettingsClient({
               }}
             >
               {busy === "wa-test" ? "Mengirim…" : "Test kirim ke admin"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex flex-wrap items-center gap-2">
+            <CardTitle className="text-base">Telegram Bot (gratis)</CardTitle>
+            <Badge
+              variant={
+                initial.telegram.bot_token.configured ? "success" : "secondary"
+              }
+            >
+              {initial.telegram.bot_token.configured
+                ? `Bot ${initial.telegram.bot_token.hint}`
+                : "Belum dikonfigurasi"}
+            </Badge>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Buat bot di @BotFather → tempel token. Chat bot, lalu ambil chat_id
+            dari getUpdates. Cocok untuk notifikasi admin tanpa biaya Fonnte.
+          </p>
+        </CardHeader>
+        <CardContent className="grid gap-3 sm:grid-cols-2">
+          <label className="flex items-center gap-2 text-sm sm:col-span-2">
+            <input
+              type="checkbox"
+              checked={tgEnabled}
+              onChange={(e) => setTgEnabled(e.target.checked)}
+            />
+            Aktifkan Telegram
+          </label>
+          <div className="space-y-1 sm:col-span-2">
+            <Label>Bot token</Label>
+            <Input
+              type="password"
+              autoComplete="off"
+              placeholder={
+                initial.telegram.bot_token.configured
+                  ? `Kosongkan untuk pertahankan (${initial.telegram.bot_token.hint})`
+                  : "123456:ABC-DEF..."
+              }
+              value={tgToken}
+              onChange={(e) => setTgToken(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1 sm:col-span-2">
+            <Label>Admin chat ID</Label>
+            <Input
+              value={tgChat}
+              onChange={(e) => setTgChat(e.target.value)}
+              placeholder="123456789 atau -100..."
+            />
+          </div>
+          <div className="flex flex-wrap gap-2 sm:col-span-2">
+            <Button disabled={!!busy} onClick={() => void saveTg()}>
+              {busy === "tg-save" ? "Menyimpan…" : "Simpan Telegram"}
+            </Button>
+            <Button
+              variant="outline"
+              disabled={!!busy}
+              onClick={() => {
+                void (async () => {
+                  setBusy("tg-test");
+                  const r = await testTelegramAction(tgChat);
+                  setBusy(null);
+                  if (!r.success) return toast.error(r.error);
+                  toast.success("Test Telegram terkirim");
+                })();
+              }}
+            >
+              {busy === "tg-test" ? "Mengirim…" : "Test kirim ke admin"}
             </Button>
           </div>
         </CardContent>

@@ -1,17 +1,14 @@
 import { NextResponse } from "next/server";
 import { CandidateStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getAdminWhatsAppPhone, sendWhatsApp } from "@/lib/whatsapp";
 import { assertCronAuth } from "@/lib/cron-auth";
 
 /**
- * GET /api/cron/remind-candidates
- * Reminder admin untuk kandidat SCREENING/NEW > 2 hari
- * Header: Authorization: Bearer CRON_SECRET
+ * Reminder kandidat screening stale (>2 hari)
  */
 export async function GET(req: Request) {
   if (!assertCronAuth(req)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
 
   const cutoff = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
@@ -24,16 +21,15 @@ export async function GET(req: Request) {
     orderBy: { created_at: "asc" },
   });
 
-  const adminPhone = await getAdminWhatsAppPhone();
-  if (adminPhone && stale.length > 0) {
+  if (stale.length > 0) {
     const names = stale
       .slice(0, 10)
       .map((c) => `${c.full_name} (${c.city})`)
       .join(", ");
-    await sendWhatsApp({
-      phone: adminPhone,
-      message: `Reminder recruitment: ${stale.length} kandidat menunggu screening >2 hari. Contoh: ${names}. Cek /admin/recruitment`,
-    });
+    const { notifyAdmin } = await import("@/lib/notify");
+    await notifyAdmin(
+      `Reminder recruitment: ${stale.length} kandidat menunggu screening >2 hari. Contoh: ${names}. Cek /admin/recruitment`
+    );
   }
 
   return NextResponse.json({

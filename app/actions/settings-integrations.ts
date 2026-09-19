@@ -6,20 +6,24 @@ import { auth, CONTRACT_ADMIN_ROLES } from "@/lib/auth";
 import {
   DEFAULT_AI,
   DEFAULT_SMTP,
+  DEFAULT_TELEGRAM,
   DEFAULT_WHATSAPP,
   SETTING_KEYS,
   getAiSettings,
   getSettingJson,
   getSmtpSettings,
+  getTelegramSettings,
   getWhatsappSettings,
   maskSecret,
   mergeSecret,
   setSettingJson,
   type AiSettings,
   type SmtpSettings,
+  type TelegramSettings,
   type WhatsappSettings,
 } from "@/lib/app-settings";
 import { sendWhatsApp } from "@/lib/whatsapp";
+import { sendTelegram } from "@/lib/telegram";
 import { sendEmail, verifySmtpConnection } from "@/lib/email";
 import { chatCompletion } from "@/lib/ai";
 
@@ -46,6 +50,11 @@ export type IntegrationsPublicConfig = {
     token: { configured: boolean; hint: string };
     source_hint: string;
   };
+  telegram: {
+    enabled: boolean;
+    admin_chat_id: string;
+    bot_token: { configured: boolean; hint: string };
+  };
   smtp: {
     enabled: boolean;
     host: string;
@@ -67,8 +76,9 @@ export type IntegrationsPublicConfig = {
 
 export async function getIntegrationsSettingsAction(): Promise<IntegrationsPublicConfig> {
   await requireSettingsAdmin();
-  const [wa, smtp, ai] = await Promise.all([
+  const [wa, tg, smtp, ai] = await Promise.all([
     getWhatsappSettings(),
+    getTelegramSettings(),
     getSmtpSettings(),
     getAiSettings(),
   ]);
@@ -85,6 +95,11 @@ export async function getIntegrationsSettingsAction(): Promise<IntegrationsPubli
       admin_phone: wa.admin_phone,
       token: maskSecret(wa.token),
       source_hint: sourceHint,
+    },
+    telegram: {
+      enabled: tg.enabled,
+      admin_chat_id: tg.admin_chat_id,
+      bot_token: maskSecret(tg.bot_token),
     },
     smtp: {
       enabled: smtp.enabled,
@@ -134,6 +149,38 @@ export async function saveWhatsappSettingsAction(
     return {
       success: false,
       error: e instanceof Error ? e.message : "Gagal simpan WA",
+    };
+  }
+}
+
+const telegramSchema = z.object({
+  enabled: z.boolean(),
+  admin_chat_id: z.string().max(64).optional(),
+  bot_token: z.string().optional(),
+  clear_token: z.boolean().optional(),
+});
+
+export async function saveTelegramSettingsAction(
+  input: z.infer<typeof telegramSchema>
+): Promise<ActionResult> {
+  try {
+    const session = await requireSettingsAdmin();
+    const parsed = telegramSchema.parse(input);
+    const current = await getTelegramSettings();
+    const next: TelegramSettings = {
+      ...DEFAULT_TELEGRAM,
+      enabled: parsed.enabled,
+      admin_chat_id: (parsed.admin_chat_id ?? "").trim(),
+      bot_token: mergeSecret(parsed.bot_token, current.bot_token, parsed.clear_token),
+    };
+    await setSettingJson(SETTING_KEYS.telegram, next, session.user.id);
+    revalidatePath("/admin/integrations");
+    revalidatePath("/admin/settings/integrations");
+    return { success: true };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Gagal simpan Telegram",
     };
   }
 }
@@ -253,6 +300,38 @@ export async function testWhatsappAction(
     return {
       success: false,
       error: e instanceof Error ? e.message : "Test WA gagal",
+    };
+  }
+}
+
+export async function testTelegramAction(
+  chatId?: string
+): Promise<ActionResult> {
+  try {
+    await requireSettingsAdmin();
+    const cfg = await getTelegramSettings();
+    const target = (chatId || cfg.admin_chat_id).trim();
+    if (!target) {
+      return { success: false, error: "Isi admin chat ID / chat uji" };
+    }
+    const res = await sendTelegram({
+      chat_id: target,
+      message: "FE-Track test Telegram — konfigurasi OK.",
+    });
+    if (res.skipped) {
+      return {
+        success: false,
+        error: "Telegram di-skip (disabled atau bot token kosong)",
+      };
+    }
+    if (!res.success) {
+      return { success: false, error: res.error ?? "Gagal kirim" };
+    }
+    return { success: true };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Test Telegram gagal",
     };
   }
 }

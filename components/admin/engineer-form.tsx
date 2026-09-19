@@ -68,6 +68,7 @@ export function EngineerForm({ initial, onSuccess }: EngineerFormProps) {
       lng: initial?.lng ?? 106.8456,
       skills: initial?.skills ?? ["EDC"],
       status: initial?.status ?? "AVAILABLE",
+      telegram_chat_id: initial?.telegram_chat_id ?? "",
     },
   });
 
@@ -192,6 +193,18 @@ export function EngineerForm({ initial, onSuccess }: EngineerFormProps) {
         {errors.skills && (
           <p className="text-xs text-destructive">{errors.skills.message}</p>
         )}
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="telegram_chat_id">Telegram Chat ID (opsional)</Label>
+        <Input
+          id="telegram_chat_id"
+          placeholder="123456789 — untuk notifikasi/OTP gratis"
+          {...register("telegram_chat_id")}
+        />
+        <p className="text-[11px] text-muted-foreground">
+          Engineer chat bot FE-Track, lalu isi chat_id dari getUpdates.
+        </p>
       </div>
 
       <div className="space-y-1.5">

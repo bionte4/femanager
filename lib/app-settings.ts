@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 
 export const SETTING_KEYS = {
   whatsapp: "integrations.whatsapp",
+  telegram: "integrations.telegram",
   smtp: "integrations.smtp",
   ai: "integrations.ai",
 } as const;
@@ -12,6 +13,13 @@ export type WhatsappSettings = {
   provider: "fonnte";
   token: string;
   admin_phone: string;
+};
+
+export type TelegramSettings = {
+  enabled: boolean;
+  bot_token: string;
+  /** Chat ID admin (bisa grup atau private) */
+  admin_chat_id: string;
 };
 
 export type SmtpSettings = {
@@ -38,6 +46,12 @@ export const DEFAULT_WHATSAPP: WhatsappSettings = {
   provider: "fonnte",
   token: "",
   admin_phone: "",
+};
+
+export const DEFAULT_TELEGRAM: TelegramSettings = {
+  enabled: false,
+  bot_token: "",
+  admin_chat_id: "",
 };
 
 export const DEFAULT_SMTP: SmtpSettings = {
@@ -97,6 +111,18 @@ export async function getWhatsappSettings(): Promise<WhatsappSettings> {
     provider: "fonnte",
     token: String(raw.token ?? "") || envToken,
     admin_phone: String(raw.admin_phone ?? "") || envAdmin,
+  };
+}
+
+export async function getTelegramSettings(): Promise<TelegramSettings> {
+  const raw = asObject(await getSettingJson(SETTING_KEYS.telegram));
+  const envToken = process.env.TELEGRAM_BOT_TOKEN?.trim() ?? "";
+  const envChat = process.env.TELEGRAM_ADMIN_CHAT_ID?.trim() ?? "";
+
+  return {
+    enabled: raw.enabled === undefined ? !!envToken : !!raw.enabled,
+    bot_token: String(raw.bot_token ?? "") || envToken,
+    admin_chat_id: String(raw.admin_chat_id ?? "") || envChat,
   };
 }
 

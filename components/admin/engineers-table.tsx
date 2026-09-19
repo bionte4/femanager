@@ -40,6 +40,7 @@ type EngineerRow = {
   engagement_type?: string;
   employment_status?: string;
   partnership_status?: string;
+  telegram_chat_id?: string | null;
 };
 
 function engagementBadge(type?: string) {
@@ -210,6 +211,7 @@ export function EngineersTable({ items }: { items: EngineerRow[] }) {
                     lng: editing.lng ?? 106.8456,
                     skills: editing.skills,
                     status: editing.status,
+                    telegram_chat_id: editing.telegram_chat_id ?? "",
                   }
                 : undefined
             }

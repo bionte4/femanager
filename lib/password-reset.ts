@@ -23,6 +23,7 @@ export async function findUserByPhoneFlexible(phone: string) {
       phone: true,
       full_name: true,
       is_suspended: true,
+      telegram_chat_id: true,
     },
   });
 }
@@ -93,18 +94,28 @@ export async function requestPasswordResetOtp(
     message: `FE-Track: kode OTP reset password Anda adalah *${code}*. Berlaku 10 menit. Jangan bagikan ke siapa pun.`,
   });
 
-  if (!wa.success) {
-    return {
-      ok: false,
-      error: "Gagal kirim WhatsApp. Coba lagi atau hubungi admin.",
-    };
+  let tgOk = false;
+  if (user.telegram_chat_id?.trim()) {
+    const { sendTelegram } = await import("@/lib/telegram");
+    const tg = await sendTelegram({
+      chat_id: user.telegram_chat_id.trim(),
+      message: `FE-Track: kode OTP reset password Anda adalah ${code}. Berlaku 10 menit. Jangan bagikan ke siapa pun.`,
+    });
+    tgOk = tg.success && !tg.skipped;
   }
 
-  if (wa.skipped) {
+  const waOk = wa.success && !wa.skipped;
+  if (!waOk && !tgOk) {
+    if (wa.skipped && !tgOk) {
+      return {
+        ok: false,
+        error:
+          "WhatsApp/Telegram belum siap. Set Fonnte atau Telegram di Integrations, dan isi Telegram Chat ID di profil engineer.",
+      };
+    }
     return {
       ok: false,
-      error:
-        "WhatsApp belum dikonfigurasi (Integrations). Hubungi admin untuk reset manual.",
+      error: wa.error || "Gagal kirim OTP. Coba lagi atau hubungi admin.",
     };
   }
 

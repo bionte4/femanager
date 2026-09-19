@@ -80,6 +80,15 @@ export const engineerSchema = z.object({
   lng: z.number().min(-180).max(180),
   skills: z.array(z.string().min(1)).min(1, "Pilih minimal 1 skill"),
   status: engineerStatusEnum,
+  telegram_chat_id: z
+    .string()
+    .max(64)
+    .optional()
+    .nullable()
+    .transform((v) => {
+      const t = (v ?? "").trim();
+      return t || null;
+    }),
 });
 
 export const slaConfigSchema = z.object({

@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma";
 import { candidateRegisterSchema } from "@/lib/validations/candidates";
 import { calculateScreeningScore } from "@/lib/candidateScoring";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
-import { sendWhatsApp } from "@/lib/whatsapp";
 
 /**
  * POST /api/candidates/register — public, max 5/hour per IP
@@ -102,15 +101,11 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Notif admin
-    const { getAdminWhatsAppPhone } = await import("@/lib/whatsapp");
-    const adminPhone = await getAdminWhatsAppPhone();
-    if (adminPhone) {
-      void sendWhatsApp({
-        phone: adminPhone,
-        message: `Ada pendaftar baru ${candidate.full_name} dari ${candidate.city}, skill ${candidate.skills.join(", ")}. Score auto: ${autoScore}. /admin/recruitment/${candidate.id}`,
-      });
-    }
+    // Notif admin (WA + Telegram)
+    const { notifyAdmin } = await import("@/lib/notify");
+    void notifyAdmin(
+      `Ada pendaftar baru ${candidate.full_name} dari ${candidate.city}, skill ${candidate.skills.join(", ")}. Score auto: ${autoScore}. /admin/recruitment/${candidate.id}`
+    );
 
     return NextResponse.json({
       success: true,

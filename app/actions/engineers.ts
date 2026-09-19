@@ -77,6 +77,7 @@ export async function getEngineers(params: {
         engagement_type: true,
         employment_status: true,
         partnership_status: true,
+        telegram_chat_id: true,
         created_at: true,
       },
     }),
@@ -120,6 +121,7 @@ export async function createEngineer(
         lng: data.lng,
         skills: data.skills,
         status: data.status,
+        telegram_chat_id: data.telegram_chat_id ?? null,
       },
     });
 
@@ -154,6 +156,7 @@ export async function updateEngineer(
       lng: data.lng,
       skills: data.skills,
       status: data.status,
+      telegram_chat_id: data.telegram_chat_id ?? null,
     };
 
     if (data.password && data.password.length >= 6) {

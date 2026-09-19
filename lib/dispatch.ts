@@ -8,8 +8,8 @@ import { sortByHaversineDistance } from "@/lib/haversine";
 import {
   buildDispatchMessage,
   buildReassignMessage,
-  sendWhatsApp,
 } from "@/lib/whatsapp";
+import { notifyUser } from "@/lib/notify";
 import {
   categoryCodeForDeviceType,
   engineerHasSkill,
@@ -38,6 +38,7 @@ export type NearbyEngineer = {
   trust_score: number;
   distance_meters: number;
   engagement_type?: string;
+  telegram_chat_id?: string | null;
 };
 
 /** @deprecated gunakan categoryCodeForDeviceType */
@@ -121,6 +122,7 @@ export async function findNearbyEngineers(
       has_motorcycle: true,
       has_toolkit: true,
       engagement_type: true,
+      telegram_chat_id: true,
       engineer_contracts: {
         where: {
           status: "ACTIVE",
@@ -197,6 +199,7 @@ export async function findNearbyEngineers(
     trust_score: e.trust_score,
     distance_meters: e.distance_meters,
     engagement_type: e.engagement_type,
+    telegram_chat_id: e.telegram_chat_id,
   }));
 }
 
@@ -409,7 +412,12 @@ export async function autoDispatchTicket(
     ? buildReassignMessage(ticket.ticket_no, ticket.tenant.name, attempt)
     : buildDispatchMessage(ticket.ticket_no, ticket.tenant.name);
 
-  await sendWhatsApp({ phone: engineer.phone, message });
+  await notifyUser({
+    phone: engineer.phone,
+    message,
+    user_id: engineer.id,
+    telegram_chat_id: engineer.telegram_chat_id,
+  });
 
   void import("@/lib/notifications").then(({ notifyAssigned }) =>
     notifyAssigned(engineer.id, {
@@ -423,8 +431,10 @@ export async function autoDispatchTicket(
   if (requiredEngineers > 1) {
     const helpers = nearby.slice(1, requiredEngineers);
     for (const helper of helpers) {
-      await sendWhatsApp({
+      await notifyUser({
         phone: helper.phone,
+        user_id: helper.id,
+        telegram_chat_id: helper.telegram_chat_id,
         message: `[FE-Track] Ticket ${ticket.ticket_no} butuh ${requiredEngineers} orang. Primary: ${engineer.full_name}. Lokasi: ${ticket.tenant.name}. Hubungi dispatcher jika siap bantu.`,
       });
     }
