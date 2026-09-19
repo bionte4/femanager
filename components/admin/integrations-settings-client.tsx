@@ -4,6 +4,13 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
+  Bot,
+  Gauge,
+  Mail,
+  MessageCircle,
+  Send,
+} from "lucide-react";
+import {
   saveAiSettingsAction,
   saveSmtpSettingsAction,
   saveTelegramSettingsAction,
@@ -18,9 +25,72 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { cn } from "@/lib/utils";
+
+function Field({
+  label,
+  className,
+  children,
+  hint,
+}: {
+  label: string;
+  className?: string;
+  children: React.ReactNode;
+  hint?: string;
+}) {
+  return (
+    <div className={cn("space-y-1", className)}>
+      <Label className="text-[11px] font-medium text-muted-foreground">
+        {label}
+      </Label>
+      {children}
+      {hint ? (
+        <p className="text-[10px] leading-snug text-muted-foreground">{hint}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function ChannelCard({
+  title,
+  icon: Icon,
+  badge,
+  description,
+  children,
+  actions,
+}: {
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
+  badge: React.ReactNode;
+  description: string;
+  children: React.ReactNode;
+  actions: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col rounded-lg border bg-card">
+      <div className="flex items-start gap-2.5 border-b px-3 py-2.5">
+        <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted">
+          <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <h3 className="text-sm font-semibold leading-none">{title}</h3>
+            {badge}
+          </div>
+          <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+            {description}
+          </p>
+        </div>
+      </div>
+      <div className="grid flex-1 gap-2.5 p-3 sm:grid-cols-2">{children}</div>
+      <div className="flex flex-wrap gap-1.5 border-t bg-muted/30 px-3 py-2">
+        {actions}
+      </div>
+    </div>
+  );
+}
 
 export function IntegrationsSettingsClient({
   initial,
@@ -121,7 +191,7 @@ export function IntegrationsSettingsClient({
     });
     setBusy(null);
     if (!res.success) return toast.error(res.error);
-    toast.success("AI card disimpan");
+    toast.success("AI disimpan");
     setAiKey("");
     router.refresh();
   }
@@ -141,58 +211,37 @@ export function IntegrationsSettingsClient({
   }
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-center gap-2">
-            <CardTitle className="text-base">WhatsApp (Fonnte)</CardTitle>
-            <Badge variant={initial.whatsapp.token.configured ? "success" : "secondary"}>
-              {initial.whatsapp.token.configured
-                ? `Token ${initial.whatsapp.token.hint}`
-                : "Token belum ada"}
-            </Badge>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {initial.whatsapp.source_hint}. Dispatch, reminder kontrak, recruitment.
-          </p>
-        </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2">
-          <label className="flex items-center gap-2 text-sm sm:col-span-2">
-            <input
-              type="checkbox"
-              checked={waEnabled}
-              onChange={(e) => setWaEnabled(e.target.checked)}
-            />
-            Aktifkan pengiriman WA
-          </label>
-          <div className="space-y-1 sm:col-span-2">
-            <Label>Fonnte token</Label>
-            <Input
-              type="password"
-              autoComplete="off"
-              placeholder={
-                initial.whatsapp.token.configured
-                  ? `Biarkan kosong untuk pertahankan (${initial.whatsapp.token.hint})`
-                  : "Tempel token Fonnte"
-              }
-              value={waToken}
-              onChange={(e) => setWaToken(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1 sm:col-span-2">
-            <Label>Nomor admin (62…)</Label>
-            <Input
-              value={waAdmin}
-              onChange={(e) => setWaAdmin(e.target.value)}
-              placeholder="628xxxxxxxxxx"
-            />
-          </div>
-          <div className="flex flex-wrap gap-2 sm:col-span-2">
-            <Button disabled={!!busy} onClick={() => void saveWa()}>
-              {busy === "wa-save" ? "Menyimpan…" : "Simpan WA"}
+    <div className="grid gap-3 lg:grid-cols-2">
+      <ChannelCard
+        title="WhatsApp"
+        icon={MessageCircle}
+        badge={
+          <Badge
+            variant={
+              initial.whatsapp.token.configured ? "success" : "secondary"
+            }
+            className="h-5 px-1.5 text-[10px]"
+          >
+            {initial.whatsapp.token.configured
+              ? initial.whatsapp.token.hint
+              : "No token"}
+          </Badge>
+        }
+        description={`${initial.whatsapp.source_hint} · Dispatch & reminder`}
+        actions={
+          <>
+            <Button
+              size="sm"
+              className="h-8"
+              disabled={!!busy}
+              onClick={() => void saveWa()}
+            >
+              {busy === "wa-save" ? "…" : "Simpan"}
             </Button>
             <Button
+              size="sm"
               variant="outline"
+              className="h-8"
               disabled={!!busy}
               onClick={() => {
                 void (async () => {
@@ -204,68 +253,76 @@ export function IntegrationsSettingsClient({
                 })();
               }}
             >
-              {busy === "wa-test" ? "Mengirim…" : "Test kirim ke admin"}
+              {busy === "wa-test" ? "…" : "Test"}
             </Button>
-          </div>
-        </CardContent>
-      </Card>
+          </>
+        }
+      >
+        <label className="flex items-center gap-2 text-xs sm:col-span-2">
+          <Checkbox
+            checked={waEnabled}
+            onCheckedChange={(v) => setWaEnabled(v === true)}
+          />
+          Aktifkan pengiriman
+        </label>
+        <Field
+          label="Fonnte token"
+          className="sm:col-span-2"
+          hint={
+            initial.whatsapp.token.configured
+              ? `Kosongkan = pertahankan (${initial.whatsapp.token.hint})`
+              : undefined
+          }
+        >
+          <Input
+            type="password"
+            autoComplete="off"
+            className="h-8 text-sm"
+            placeholder="Token Fonnte"
+            value={waToken}
+            onChange={(e) => setWaToken(e.target.value)}
+          />
+        </Field>
+        <Field label="Admin phone (62…)" className="sm:col-span-2">
+          <Input
+            className="h-8 text-sm"
+            value={waAdmin}
+            onChange={(e) => setWaAdmin(e.target.value)}
+            placeholder="628xxxxxxxxxx"
+          />
+        </Field>
+      </ChannelCard>
 
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-center gap-2">
-            <CardTitle className="text-base">Telegram Bot (gratis)</CardTitle>
-            <Badge
-              variant={
-                initial.telegram.bot_token.configured ? "success" : "secondary"
-              }
+      <ChannelCard
+        title="Telegram"
+        icon={Send}
+        badge={
+          <Badge
+            variant={
+              initial.telegram.bot_token.configured ? "success" : "secondary"
+            }
+            className="h-5 px-1.5 text-[10px]"
+          >
+            {initial.telegram.bot_token.configured
+              ? initial.telegram.bot_token.hint
+              : "No bot"}
+          </Badge>
+        }
+        description="Bot gratis via @BotFather · notifikasi & OTP"
+        actions={
+          <>
+            <Button
+              size="sm"
+              className="h-8"
+              disabled={!!busy}
+              onClick={() => void saveTg()}
             >
-              {initial.telegram.bot_token.configured
-                ? `Bot ${initial.telegram.bot_token.hint}`
-                : "Belum dikonfigurasi"}
-            </Badge>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Buat bot di @BotFather → tempel token. Chat bot, lalu ambil chat_id
-            dari getUpdates. Cocok untuk notifikasi admin tanpa biaya Fonnte.
-          </p>
-        </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2">
-          <label className="flex items-center gap-2 text-sm sm:col-span-2">
-            <input
-              type="checkbox"
-              checked={tgEnabled}
-              onChange={(e) => setTgEnabled(e.target.checked)}
-            />
-            Aktifkan Telegram
-          </label>
-          <div className="space-y-1 sm:col-span-2">
-            <Label>Bot token</Label>
-            <Input
-              type="password"
-              autoComplete="off"
-              placeholder={
-                initial.telegram.bot_token.configured
-                  ? `Kosongkan untuk pertahankan (${initial.telegram.bot_token.hint})`
-                  : "123456:ABC-DEF..."
-              }
-              value={tgToken}
-              onChange={(e) => setTgToken(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1 sm:col-span-2">
-            <Label>Admin chat ID</Label>
-            <Input
-              value={tgChat}
-              onChange={(e) => setTgChat(e.target.value)}
-              placeholder="123456789 atau -100..."
-            />
-          </div>
-          <div className="flex flex-wrap gap-2 sm:col-span-2">
-            <Button disabled={!!busy} onClick={() => void saveTg()}>
-              {busy === "tg-save" ? "Menyimpan…" : "Simpan Telegram"}
+              {busy === "tg-save" ? "…" : "Simpan"}
             </Button>
             <Button
+              size="sm"
               variant="outline"
+              className="h-8"
               disabled={!!busy}
               onClick={() => {
                 void (async () => {
@@ -277,108 +334,68 @@ export function IntegrationsSettingsClient({
                 })();
               }}
             >
-              {busy === "tg-test" ? "Mengirim…" : "Test kirim ke admin"}
+              {busy === "tg-test" ? "…" : "Test"}
             </Button>
-          </div>
-        </CardContent>
-      </Card>
+          </>
+        }
+      >
+        <label className="flex items-center gap-2 text-xs sm:col-span-2">
+          <Checkbox
+            checked={tgEnabled}
+            onCheckedChange={(v) => setTgEnabled(v === true)}
+          />
+          Aktifkan Telegram
+        </label>
+        <Field label="Bot token" className="sm:col-span-2">
+          <Input
+            type="password"
+            autoComplete="off"
+            className="h-8 text-sm"
+            placeholder={
+              initial.telegram.bot_token.configured
+                ? `Kosongkan = pertahankan (${initial.telegram.bot_token.hint})`
+                : "123456:ABC-DEF…"
+            }
+            value={tgToken}
+            onChange={(e) => setTgToken(e.target.value)}
+          />
+        </Field>
+        <Field label="Admin chat ID" className="sm:col-span-2">
+          <Input
+            className="h-8 text-sm"
+            value={tgChat}
+            onChange={(e) => setTgChat(e.target.value)}
+            placeholder="123456789 / -100…"
+          />
+        </Field>
+      </ChannelCard>
 
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-center gap-2">
-            <CardTitle className="text-base">SMTP / Email</CardTitle>
-            <Badge variant={initial.smtp.password.configured || initial.smtp.host ? "success" : "secondary"}>
-              {initial.smtp.enabled ? "Enabled" : "Disabled"}
-            </Badge>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Notifikasi email (test & utilitas). Gmail/SMTP provider lain didukung.
-          </p>
-        </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2">
-          <label className="flex items-center gap-2 text-sm sm:col-span-2">
-            <input
-              type="checkbox"
-              checked={smtpEnabled}
-              onChange={(e) => setSmtpEnabled(e.target.checked)}
-            />
-            Aktifkan SMTP
-          </label>
-          <div className="space-y-1">
-            <Label>Host</Label>
-            <Input
-              value={smtpHost}
-              onChange={(e) => setSmtpHost(e.target.value)}
-              placeholder="smtp.gmail.com"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label>Port</Label>
-            <Input
-              value={smtpPort}
-              onChange={(e) => setSmtpPort(e.target.value)}
-              placeholder="587"
-            />
-          </div>
-          <label className="flex items-center gap-2 text-sm sm:col-span-2">
-            <input
-              type="checkbox"
-              checked={smtpSecure}
-              onChange={(e) => setSmtpSecure(e.target.checked)}
-            />
-            Secure (TLS/SSL — biasanya port 465)
-          </label>
-          <div className="space-y-1">
-            <Label>Username</Label>
-            <Input
-              value={smtpUser}
-              onChange={(e) => setSmtpUser(e.target.value)}
-              autoComplete="off"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label>Password</Label>
-            <Input
-              type="password"
-              autoComplete="new-password"
-              placeholder={
-                initial.smtp.password.configured
-                  ? `Kosongkan untuk pertahankan (${initial.smtp.password.hint})`
-                  : "App password"
-              }
-              value={smtpPass}
-              onChange={(e) => setSmtpPass(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label>From email</Label>
-            <Input
-              value={smtpFrom}
-              onChange={(e) => setSmtpFrom(e.target.value)}
-              placeholder="noreply@domain.com"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label>From name</Label>
-            <Input
-              value={smtpFromName}
-              onChange={(e) => setSmtpFromName(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1 sm:col-span-2">
-            <Label>Email uji</Label>
-            <Input
-              value={testEmail}
-              onChange={(e) => setTestEmail(e.target.value)}
-              placeholder="you@company.com"
-            />
-          </div>
-          <div className="flex flex-wrap gap-2 sm:col-span-2">
-            <Button disabled={!!busy} onClick={() => void saveSmtp()}>
-              {busy === "smtp-save" ? "Menyimpan…" : "Simpan SMTP"}
+      <ChannelCard
+        title="SMTP / Email"
+        icon={Mail}
+        badge={
+          <Badge
+            variant={initial.smtp.enabled ? "success" : "secondary"}
+            className="h-5 px-1.5 text-[10px]"
+          >
+            {initial.smtp.enabled ? "On" : "Off"}
+          </Badge>
+        }
+        description="OTP reset password & utilitas email"
+        actions={
+          <>
+            <Button
+              size="sm"
+              className="h-8"
+              disabled={!!busy}
+              onClick={() => void saveSmtp()}
+            >
+              {busy === "smtp-save" ? "…" : "Simpan"}
             </Button>
             <Button
+              size="sm"
               variant="outline"
+              className="h-8"
               disabled={!!busy}
               onClick={() => {
                 void (async () => {
@@ -390,70 +407,114 @@ export function IntegrationsSettingsClient({
                 })();
               }}
             >
-              {busy === "smtp-test" ? "Mengirim…" : "Test kirim email"}
+              {busy === "smtp-test" ? "…" : "Test"}
             </Button>
-          </div>
-        </CardContent>
-      </Card>
+          </>
+        }
+      >
+        <label className="flex items-center gap-2 text-xs">
+          <Checkbox
+            checked={smtpEnabled}
+            onCheckedChange={(v) => setSmtpEnabled(v === true)}
+          />
+          Aktifkan SMTP
+        </label>
+        <label className="flex items-center gap-2 text-xs">
+          <Checkbox
+            checked={smtpSecure}
+            onCheckedChange={(v) => setSmtpSecure(v === true)}
+          />
+          TLS/SSL (465)
+        </label>
+        <Field label="Host">
+          <Input
+            className="h-8 text-sm"
+            value={smtpHost}
+            onChange={(e) => setSmtpHost(e.target.value)}
+            placeholder="smtp.gmail.com"
+          />
+        </Field>
+        <Field label="Port">
+          <Input
+            className="h-8 text-sm"
+            value={smtpPort}
+            onChange={(e) => setSmtpPort(e.target.value)}
+            placeholder="587"
+          />
+        </Field>
+        <Field label="Username">
+          <Input
+            className="h-8 text-sm"
+            value={smtpUser}
+            onChange={(e) => setSmtpUser(e.target.value)}
+            autoComplete="off"
+          />
+        </Field>
+        <Field label="Password">
+          <Input
+            type="password"
+            autoComplete="new-password"
+            className="h-8 text-sm"
+            placeholder={
+              initial.smtp.password.configured
+                ? `•••• (${initial.smtp.password.hint})`
+                : "App password"
+            }
+            value={smtpPass}
+            onChange={(e) => setSmtpPass(e.target.value)}
+          />
+        </Field>
+        <Field label="From email">
+          <Input
+            className="h-8 text-sm"
+            value={smtpFrom}
+            onChange={(e) => setSmtpFrom(e.target.value)}
+            placeholder="noreply@domain.com"
+          />
+        </Field>
+        <Field label="From name">
+          <Input
+            className="h-8 text-sm"
+            value={smtpFromName}
+            onChange={(e) => setSmtpFromName(e.target.value)}
+          />
+        </Field>
+        <Field label="Email uji" className="sm:col-span-2">
+          <Input
+            className="h-8 text-sm"
+            value={testEmail}
+            onChange={(e) => setTestEmail(e.target.value)}
+            placeholder="you@company.com"
+          />
+        </Field>
+      </ChannelCard>
 
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-center gap-2">
-            <CardTitle className="text-base">AI Card (KB Chat)</CardTitle>
-            <Badge variant={initial.ai.api_key.configured ? "success" : "secondary"}>
-              {initial.ai.enabled ? "AI on" : "Search lokal saja"}
-            </Badge>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            OpenAI-compatible API. Jika aktif, jawaban KB chat dipoles dari hit SOP.
-            Kosongkan = fallback search lokal tanpa LLM.
-          </p>
-        </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2">
-          <label className="flex items-center gap-2 text-sm sm:col-span-2">
-            <input
-              type="checkbox"
-              checked={aiEnabled}
-              onChange={(e) => setAiEnabled(e.target.checked)}
-            />
-            Aktifkan AI enhancement
-          </label>
-          <div className="space-y-1 sm:col-span-2">
-            <Label>Base URL</Label>
-            <Input
-              value={aiBase}
-              onChange={(e) => setAiBase(e.target.value)}
-              placeholder="https://api.openai.com/v1"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label>Model</Label>
-            <Input
-              value={aiModel}
-              onChange={(e) => setAiModel(e.target.value)}
-              placeholder="gpt-4o-mini"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label>API key</Label>
-            <Input
-              type="password"
-              autoComplete="off"
-              placeholder={
-                initial.ai.api_key.configured
-                  ? `Kosongkan untuk pertahankan (${initial.ai.api_key.hint})`
-                  : "sk-..."
-              }
-              value={aiKey}
-              onChange={(e) => setAiKey(e.target.value)}
-            />
-          </div>
-          <div className="flex flex-wrap gap-2 sm:col-span-2">
-            <Button disabled={!!busy} onClick={() => void saveAi()}>
-              {busy === "ai-save" ? "Menyimpan…" : "Simpan AI"}
+      <ChannelCard
+        title="AI (KB Chat)"
+        icon={Bot}
+        badge={
+          <Badge
+            variant={initial.ai.enabled ? "success" : "secondary"}
+            className="h-5 px-1.5 text-[10px]"
+          >
+            {initial.ai.enabled ? "LLM on" : "Lokal"}
+          </Badge>
+        }
+        description="OpenAI-compatible · kosong = search SOP lokal"
+        actions={
+          <>
+            <Button
+              size="sm"
+              className="h-8"
+              disabled={!!busy}
+              onClick={() => void saveAi()}
+            >
+              {busy === "ai-save" ? "…" : "Simpan"}
             </Button>
             <Button
+              size="sm"
               variant="outline"
+              className="h-8"
               disabled={!!busy}
               onClick={() => {
                 void (async () => {
@@ -465,79 +526,115 @@ export function IntegrationsSettingsClient({
                 })();
               }}
             >
-              {busy === "ai-test" ? "Mengetes…" : "Test AI"}
+              {busy === "ai-test" ? "…" : "Test"}
             </Button>
-          </div>
-        </CardContent>
-      </Card>
+          </>
+        }
+      >
+        <label className="flex items-center gap-2 text-xs sm:col-span-2">
+          <Checkbox
+            checked={aiEnabled}
+            onCheckedChange={(v) => setAiEnabled(v === true)}
+          />
+          Aktifkan AI enhancement
+        </label>
+        <Field label="Base URL" className="sm:col-span-2">
+          <Input
+            className="h-8 font-mono text-xs"
+            value={aiBase}
+            onChange={(e) => setAiBase(e.target.value)}
+            placeholder="https://api.openai.com/v1"
+          />
+        </Field>
+        <Field label="Model">
+          <Input
+            className="h-8 text-sm"
+            value={aiModel}
+            onChange={(e) => setAiModel(e.target.value)}
+            placeholder="gpt-4o-mini"
+          />
+        </Field>
+        <Field label="API key">
+          <Input
+            type="password"
+            autoComplete="off"
+            className="h-8 text-sm"
+            placeholder={
+              initial.ai.api_key.configured
+                ? `•••• (${initial.ai.api_key.hint})`
+                : "sk-…"
+            }
+            value={aiKey}
+            onChange={(e) => setAiKey(e.target.value)}
+          />
+        </Field>
+      </ChannelCard>
 
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-center gap-2">
-            <CardTitle className="text-base">Workload Guard</CardTitle>
-            <Badge variant={wlEnabled ? "success" : "secondary"}>
-              {wlEnabled ? "Enabled" : "Disabled"}
-            </Badge>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Batas beban FE untuk auto-dispatch &amp; assign manual. Disimpan di
-            database (ops.workload).
-          </p>
-        </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2">
-          <label className="flex items-center gap-2 text-sm sm:col-span-2">
-            <Checkbox
-              checked={wlEnabled}
-              onCheckedChange={(v) => setWlEnabled(v === true)}
-            />
-            Aktifkan Workload Guard
-          </label>
-          <div className="space-y-1">
-            <Label>MAX_ACTIVE (ticket)</Label>
-            <Input
-              type="number"
-              min={1}
-              max={20}
-              value={wlMaxActive}
-              onChange={(e) => setWlMaxActive(e.target.value)}
-            />
-            <p className="text-[11px] text-muted-foreground">
-              Max ticket aktif per engineer (default 2)
-            </p>
-          </div>
-          <div className="space-y-1">
-            <Label>MAX_LOAD (menit)</Label>
-            <Input
-              type="number"
-              min={30}
-              max={1440}
-              value={wlMaxLoad}
-              onChange={(e) => setWlMaxLoad(e.target.value)}
-            />
-            <p className="text-[11px] text-muted-foreground">
-              Max total estimasi durasi ticket aktif (default 240)
-            </p>
-          </div>
-          <div className="space-y-1 sm:col-span-2">
-            <Label>WARN_LOAD (menit)</Label>
-            <Input
-              type="number"
-              min={15}
-              max={1440}
-              value={wlWarnLoad}
-              onChange={(e) => setWlWarnLoad(e.target.value)}
-            />
-            <p className="text-[11px] text-muted-foreground">
-              Ambang kuning di UI assign (default 180, harus ≤ MAX_LOAD)
-            </p>
-          </div>
-          <div className="sm:col-span-2">
-            <Button disabled={!!busy} onClick={() => void saveWorkload()}>
-              {busy === "wl-save" ? "Menyimpan…" : "Simpan Workload Guard"}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <ChannelCard
+        title="Workload Guard"
+        icon={Gauge}
+        badge={
+          <Badge
+            variant={wlEnabled ? "success" : "secondary"}
+            className="h-5 px-1.5 text-[10px]"
+          >
+            {wlEnabled ? "On" : "Off"}
+          </Badge>
+        }
+        description="Batas beban FE · auto-dispatch & assign · ops.workload"
+        actions={
+          <Button
+            size="sm"
+            className="h-8"
+            disabled={!!busy}
+            onClick={() => void saveWorkload()}
+          >
+            {busy === "wl-save" ? "…" : "Simpan"}
+          </Button>
+        }
+      >
+        <label className="flex items-center gap-2 text-xs sm:col-span-2">
+          <Checkbox
+            checked={wlEnabled}
+            onCheckedChange={(v) => setWlEnabled(v === true)}
+          />
+          Aktifkan guard
+        </label>
+        <Field label="MAX_ACTIVE" hint="Ticket aktif / FE">
+          <Input
+            type="number"
+            min={1}
+            max={20}
+            className="h-8 text-sm"
+            value={wlMaxActive}
+            onChange={(e) => setWlMaxActive(e.target.value)}
+          />
+        </Field>
+        <Field label="MAX_LOAD (mnt)" hint="Total estimasi aktif">
+          <Input
+            type="number"
+            min={30}
+            max={1440}
+            className="h-8 text-sm"
+            value={wlMaxLoad}
+            onChange={(e) => setWlMaxLoad(e.target.value)}
+          />
+        </Field>
+        <Field
+          label="WARN_LOAD (mnt)"
+          className="sm:col-span-2"
+          hint="Ambang kuning di UI assign (≤ MAX_LOAD)"
+        >
+          <Input
+            type="number"
+            min={15}
+            max={1440}
+            className="h-8 text-sm"
+            value={wlWarnLoad}
+            onChange={(e) => setWlWarnLoad(e.target.value)}
+          />
+        </Field>
+      </ChannelCard>
     </div>
   );
 }

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Copy, Eye, Plus, BookOpen } from "lucide-react";
+import { Copy, Eye, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { createIntegration } from "@/app/actions/integrations";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -74,21 +74,17 @@ export function IntegrationsTable({ items }: { items: Row[] }) {
 
   return (
     <>
-      <div className="mb-4 flex flex-wrap justify-between gap-2">
-        <Button variant="outline" asChild>
-          <Link href="/admin/integrations/docs">
-            <BookOpen className="h-4 w-4" />
-            Dokumentasi API
-          </Link>
-        </Button>
+      <div className="mb-2 flex justify-end">
         <Button
+          size="sm"
+          className="h-8"
           onClick={() => {
             setForm({ customer_name: "", webhook_url: "", webhook_secret: "" });
             setOpen(true);
           }}
         >
-          <Plus className="h-4 w-4" />
-          Create Integration
+          <Plus className="h-3.5 w-3.5" />
+          Tambah customer
         </Button>
       </div>
 
