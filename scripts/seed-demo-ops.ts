@@ -435,8 +435,9 @@ async function upsertPkwt(passwordHash: string) {
     where: { user_id: u.id, status: "ACTIVE", type: "PKWT_OUTTASK" },
   });
   const start = new Date();
+  // 14 hari lagi → muncul di inbox "Kontrak hampir expired" (window 30 hari)
   const end = new Date();
-  end.setFullYear(end.getFullYear() + 1);
+  end.setDate(end.getDate() + 14);
 
   if (!existing) {
     await prisma.engineerContract.create({
@@ -448,7 +449,7 @@ async function upsertPkwt(passwordHash: string) {
         end_at: end,
         client_label: PKWT.client_label,
         placement_cities: [...PKWT.placement_cities],
-        notes: "Seed demo — kontrak 1 tahun",
+        notes: "Seed demo — kontrak ACTIVE, expire ~14 hari (untuk inbox HR)",
         created_by: "seed-demo-ops",
       },
     });
@@ -459,6 +460,16 @@ async function upsertPkwt(passwordHash: string) {
         to_type: EngagementType.PKWT_OUTTASK,
         reason: "seed-demo-ops",
         changed_by: "seed-demo-ops",
+      },
+    });
+  } else {
+    await prisma.engineerContract.update({
+      where: { id: existing.id },
+      data: {
+        end_at: end,
+        client_label: PKWT.client_label,
+        placement_cities: [...PKWT.placement_cities],
+        notes: "Seed demo — kontrak ACTIVE, expire ~14 hari (untuk inbox HR)",
       },
     });
   }
