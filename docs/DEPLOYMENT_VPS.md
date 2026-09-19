@@ -218,6 +218,25 @@ npx tsx scripts/create-admin.ts
 
 Login: `https://klikhadir.site/login` → phone + password di atas.
 
+### Seed ops terbatas (2 Mitra + 1 PKWT + KB)
+
+Bukan `prisma db seed` penuh. Hanya engineer uji + SOP KB + agreement aktif:
+
+```bash
+cd /opt/fetrack
+SEED_PASSWORD='GantiPasswordKu4t' npx tsx scripts/seed-demo-ops.ts
+# atau: npm run seed:ops
+```
+
+| Akun | Phone (default) | Tipe |
+|------|-----------------|------|
+| Mitra 1 | `081222222001` | Mitra, agreement signed |
+| Mitra 2 | `081222222002` | Mitra, agreement signed |
+| PKWT | `081222222003` | PKWT Outtask + kontrak ACTIVE |
+
+Knowledge Base terisi dari `prisma/seed-knowledge-base.ts`.  
+**Ganti password** setelah uji.
+
 ---
 
 ## 7. PM2
