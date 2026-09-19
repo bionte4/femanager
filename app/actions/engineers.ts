@@ -7,6 +7,13 @@ import { prisma } from "@/lib/prisma";
 import { auth, ADMIN_ROLES } from "@/lib/auth";
 import { engineerSchema, type EngineerInput } from "@/lib/validations/master";
 
+/** Parse YYYY-MM-DD → Date noon UTC (hindari geser hari karena TZ). */
+function parseBirthDate(ymd: string | null | undefined): Date | null {
+  if (!ymd) return null;
+  const d = new Date(`${ymd}T12:00:00.000Z`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 async function requireAdmin() {
   const session = await auth();
   if (!session?.user || !(ADMIN_ROLES as readonly string[]).includes(session.user.role)) {
@@ -78,13 +85,19 @@ export async function getEngineers(params: {
         employment_status: true,
         partnership_status: true,
         telegram_chat_id: true,
+        birth_date: true,
         created_at: true,
       },
     }),
   ]);
 
   return {
-    items,
+    items: items.map((i) => ({
+      ...i,
+      birth_date: i.birth_date
+        ? i.birth_date.toISOString().slice(0, 10)
+        : null,
+    })),
     total,
     page,
     pageSize,
@@ -122,6 +135,7 @@ export async function createEngineer(
         skills: data.skills,
         status: data.status,
         telegram_chat_id: data.telegram_chat_id ?? null,
+        birth_date: parseBirthDate(data.birth_date),
       },
     });
 
@@ -157,6 +171,7 @@ export async function updateEngineer(
       skills: data.skills,
       status: data.status,
       telegram_chat_id: data.telegram_chat_id ?? null,
+      birth_date: parseBirthDate(data.birth_date),
     };
 
     if (data.password && data.password.length >= 6) {

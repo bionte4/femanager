@@ -41,7 +41,15 @@ type EngineerRow = {
   employment_status?: string;
   partnership_status?: string;
   telegram_chat_id?: string | null;
+  /** ISO date atau YYYY-MM-DD dari server */
+  birth_date?: string | Date | null;
 };
+
+function toDateInputValue(v?: string | Date | null): string {
+  if (!v) return "";
+  if (typeof v === "string") return v.slice(0, 10);
+  return v.toISOString().slice(0, 10);
+}
 
 function engagementBadge(type?: string) {
   if (type === "PKWT_OUTTASK") return { label: "PKWT Outtask", variant: "secondary" as const };
@@ -212,6 +220,7 @@ export function EngineersTable({ items }: { items: EngineerRow[] }) {
                     skills: editing.skills,
                     status: editing.status,
                     telegram_chat_id: editing.telegram_chat_id ?? "",
+                    birth_date: toDateInputValue(editing.birth_date),
                   }
                 : undefined
             }

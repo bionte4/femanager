@@ -340,6 +340,7 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 * * * * * curl -fsS -H "Authorization: Bearer ${SECRET}" "https://klikhadir.site/api/cron/check-dispatch" >>/home/ubuntu/fetrack-cron.log 2>&1
 */5 * * * * curl -fsS -H "Authorization: Bearer ${SECRET}" "https://klikhadir.site/api/cron/webhook-dlq" >>/home/ubuntu/fetrack-cron.log 2>&1
 0 2 * * * curl -fsS -H "Authorization: Bearer ${SECRET}" "https://klikhadir.site/api/cron/expire-contracts" >>/home/ubuntu/fetrack-cron.log 2>&1
+0 8 * * * curl -fsS -H "Authorization: Bearer ${SECRET}" "https://klikhadir.site/api/cron/birthday-greetings" >>/home/ubuntu/fetrack-cron.log 2>&1
 0 9 * * * curl -fsS -H "Authorization: Bearer ${SECRET}" "https://klikhadir.site/api/cron/remind-contracts" >>/home/ubuntu/fetrack-cron.log 2>&1
 0 10 * * * curl -fsS -H "Authorization: Bearer ${SECRET}" "https://klikhadir.site/api/cron/remind-candidates" >>/home/ubuntu/fetrack-cron.log 2>&1
 0 3 * * * /usr/local/bin/fetrack-backup.sh >>/var/backups/fetrack/backup.log 2>&1
@@ -354,6 +355,7 @@ crontab -l | sed 's/Bearer .*/Bearer ***/'
 | tiap 1 menit | `check-dispatch` | timeout accept / re-dispatch |
 | tiap 5 menit | `webhook-dlq` | retry webhook |
 | 02:00 | `expire-contracts` | PKWT expired |
+| 08:00 | `birthday-greetings` | ucapan ulang tahun WA/Telegram |
 | 09:00 | `remind-contracts` | reminder WA kontrak |
 | 10:00 | `remind-candidates` | kandidat stale |
 | 03:00 | backup script | DB + uploads |

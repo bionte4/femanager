@@ -53,6 +53,8 @@ const MITRA = [
     lat: -6.2435,
     lng: 106.7998,
     skills: ["EDC", "LAN"],
+    /// Hari ini (WIB) — agar cron birthday bisa diuji segera
+    birth_today: true as const,
   },
   {
     phone: "081222222002",
@@ -62,6 +64,7 @@ const MITRA = [
     lat: -6.2383,
     lng: 106.9756,
     skills: ["EDC", "WAN", "WIFI"],
+    birth_md: "03-15" as const,
   },
 ] as const;
 
@@ -75,7 +78,29 @@ const PKWT = {
   skills: ["EDC", "SDWAN", "LAN"],
   client_label: "Bank Demo Outtask",
   placement_cities: ["Jakarta Pusat", "Jakarta Selatan"],
+  birth_md: "07-20" as const,
 } as const;
+
+/** YYYY-MM-DD noon UTC; birth_today = bulan-hari WIB hari ini, year-28. */
+function demoBirthDate(opts: {
+  birth_today?: boolean;
+  birth_md?: string;
+}): Date {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const y = Number(parts.find((p) => p.type === "year")?.value);
+  const m = opts.birth_today
+    ? parts.find((p) => p.type === "month")?.value
+    : opts.birth_md?.slice(0, 2);
+  const d = opts.birth_today
+    ? parts.find((p) => p.type === "day")?.value
+    : opts.birth_md?.slice(3, 5);
+  return new Date(`${y - 28}-${m}-${d}T12:00:00.000Z`);
+}
 
 const TENANTS = [
   {
@@ -336,6 +361,10 @@ async function upsertMitra(
       has_motorcycle: true,
       has_toolkit: true,
       is_suspended: false,
+      birth_date: demoBirthDate({
+        birth_today: "birth_today" in eng ? eng.birth_today : undefined,
+        birth_md: "birth_md" in eng ? eng.birth_md : undefined,
+      }),
     },
     create: {
       full_name: eng.full_name,
@@ -353,6 +382,10 @@ async function upsertMitra(
       partnership_status: PartnershipStatus.SIGNED,
       has_motorcycle: true,
       has_toolkit: true,
+      birth_date: demoBirthDate({
+        birth_today: "birth_today" in eng ? eng.birth_today : undefined,
+        birth_md: "birth_md" in eng ? eng.birth_md : undefined,
+      }),
     },
   });
 
@@ -411,6 +444,7 @@ async function upsertPkwt(passwordHash: string) {
       has_motorcycle: true,
       has_toolkit: true,
       is_suspended: false,
+      birth_date: demoBirthDate({ birth_md: PKWT.birth_md }),
     },
     create: {
       full_name: PKWT.full_name,
@@ -428,6 +462,7 @@ async function upsertPkwt(passwordHash: string) {
       partnership_status: PartnershipStatus.NOT_SIGNED,
       has_motorcycle: true,
       has_toolkit: true,
+      birth_date: demoBirthDate({ birth_md: PKWT.birth_md }),
     },
   });
 
@@ -755,6 +790,7 @@ async function main() {
   console.log(`  Mitra 1: ${MITRA[0].phone} / ${PASSWORD}`);
   console.log(`  Mitra 2: ${MITRA[1].phone} / ${PASSWORD}`);
   console.log(`  PKWT:    ${PKWT.phone} / ${PASSWORD}`);
+  console.log("  Birthday: Mitra 1 = hari ini (uji cron /api/cron/birthday-greetings)");
   console.log("  Reset password: Edit Engineer di admin, atau scripts/reset-password.ts");
   console.log("================================");
 }

@@ -69,6 +69,7 @@ export function EngineerForm({ initial, onSuccess }: EngineerFormProps) {
       skills: initial?.skills ?? ["EDC"],
       status: initial?.status ?? "AVAILABLE",
       telegram_chat_id: initial?.telegram_chat_id ?? "",
+      birth_date: initial?.birth_date ?? "",
     },
   });
 
@@ -195,16 +196,28 @@ export function EngineerForm({ initial, onSuccess }: EngineerFormProps) {
         )}
       </div>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="telegram_chat_id">Telegram Chat ID (opsional)</Label>
-        <Input
-          id="telegram_chat_id"
-          placeholder="123456789 — untuk notifikasi/OTP gratis"
-          {...register("telegram_chat_id")}
-        />
-        <p className="text-[11px] text-muted-foreground">
-          Engineer chat bot FE-Track, lalu isi chat_id dari getUpdates.
-        </p>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label htmlFor="birth_date">Tanggal lahir (opsional)</Label>
+          <Input id="birth_date" type="date" {...register("birth_date")} />
+          <p className="text-[11px] text-muted-foreground">
+            Untuk ucapan otomatis via WA/Telegram tiap pagi.
+          </p>
+          {errors.birth_date && (
+            <p className="text-xs text-destructive">{errors.birth_date.message}</p>
+          )}
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="telegram_chat_id">Telegram Chat ID (opsional)</Label>
+          <Input
+            id="telegram_chat_id"
+            placeholder="123456789 — untuk notifikasi/OTP gratis"
+            {...register("telegram_chat_id")}
+          />
+          <p className="text-[11px] text-muted-foreground">
+            Engineer chat bot FE-Track, lalu isi chat_id dari getUpdates.
+          </p>
+        </div>
       </div>
 
       <div className="space-y-1.5">

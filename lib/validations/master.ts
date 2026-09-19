@@ -89,6 +89,18 @@ export const engineerSchema = z.object({
       const t = (v ?? "").trim();
       return t || null;
     }),
+  /// YYYY-MM-DD dari <input type="date">; kosong = null
+  birth_date: z
+    .string()
+    .optional()
+    .nullable()
+    .transform((v) => {
+      const t = (v ?? "").trim();
+      return t || null;
+    })
+    .refine((v) => v === null || /^\d{4}-\d{2}-\d{2}$/.test(v), {
+      message: "Format tanggal lahir YYYY-MM-DD",
+    }),
 });
 
 export const slaConfigSchema = z.object({

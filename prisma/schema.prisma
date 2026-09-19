@@ -219,6 +219,8 @@ model User {
   can_work_for_others Boolean  @default(true)
   /// Chat ID Telegram untuk notifikasi / OTP (opsional, gratis)
   telegram_chat_id String?
+  /// Tanggal lahir — untuk cron ucapan ulang tahun WA/Telegram
+  birth_date    DateTime?      @db.Date
   created_at    DateTime       @default(now())
   updated_at    DateTime       @updatedAt
 
@@ -239,6 +241,7 @@ model User {
   sparepart_mutations SparepartMutation[]
   engineer_contracts  EngineerContract[]
   engagement_changes  EngagementChangeLog[]
+  birthday_greetings  BirthdayGreetingLog[]
 
   @@map("users")
 }
@@ -913,4 +916,20 @@ model PasswordResetOtp {
 
   @@index([phone, created_at])
   @@map("password_reset_otps")
+}
+
+/// Idempotent log ucapan ulang tahun (1x per user per tahun kalender)
+model BirthdayGreetingLog {
+  id         String   @id @default(cuid())
+  user_id    String
+  year       Int
+  /// whatsapp | telegram | both | none
+  channels   String
+  sent_at    DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, year])
+  @@index([year, sent_at])
+  @@map("birthday_greeting_logs")
 }
