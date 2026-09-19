@@ -13,6 +13,7 @@ import {
   deviceExcelRowSchema,
   type DevicePreviewRow,
 } from "@/lib/validations/device-excel";
+import { requireMasterAdmin } from "@/lib/rbac";
 
 async function requireAdmin() {
   const session = await auth();
@@ -32,7 +33,7 @@ export async function getDevices(params: {
   page?: number;
   pageSize?: number;
 }) {
-  await requireAdmin();
+  await requireMasterAdmin();
   const page = Math.max(1, params.page ?? 1);
   const pageSize = Math.min(50, Math.max(5, params.pageSize ?? 10));
   const q = params.q?.trim();
@@ -77,7 +78,7 @@ export async function getDevices(params: {
 
 export async function createDevice(input: DeviceInput): Promise<ActionResult<{ id: string }>> {
   try {
-    await requireAdmin();
+    await requireMasterAdmin();
     const data = deviceSchema.parse(input);
 
     const existing = await prisma.device.findUnique({
@@ -119,7 +120,7 @@ export async function createDevice(input: DeviceInput): Promise<ActionResult<{ i
 
 export async function updateDevice(id: string, input: DeviceInput): Promise<ActionResult> {
   try {
-    await requireAdmin();
+    await requireMasterAdmin();
     const data = deviceSchema.parse(input);
 
     const conflict = await prisma.device.findFirst({
@@ -159,7 +160,7 @@ export async function updateDevice(id: string, input: DeviceInput): Promise<Acti
 
 export async function deleteDevice(id: string): Promise<ActionResult> {
   try {
-    await requireAdmin();
+    await requireMasterAdmin();
     await prisma.device.delete({ where: { id } });
     revalidatePath("/admin/devices");
     return { success: true };
@@ -176,7 +177,7 @@ function categoryFromType(type: string): "EDC" | "ROUTER_SDWAN" | "SWITCH" | "AC
 }
 
 export async function getDevicesForExport() {
-  await requireAdmin();
+  await requireMasterAdmin();
   const rows = await prisma.device.findMany({
     orderBy: { serial_number: "asc" },
     take: 5000,
@@ -204,7 +205,7 @@ export async function previewDevicesImport(
   ActionResult<{ rows: DevicePreviewRow[]; okCount: number; errorCount: number }>
 > {
   try {
-    await requireAdmin();
+    await requireMasterAdmin();
     if (!Array.isArray(rawRows) || rawRows.length === 0) {
       return { success: false, error: "File kosong / tidak ada baris data" };
     }
@@ -355,7 +356,7 @@ export async function commitDevicesImport(
   previewRows: DevicePreviewRow[]
 ): Promise<ActionResult<{ created: number; updated: number }>> {
   try {
-    await requireAdmin();
+    await requireMasterAdmin();
     const valid = previewRows.filter(
       (r) =>
         (r.action === "create" || r.action === "update") &&

@@ -63,7 +63,13 @@ function statusVariant(status: EngineerStatus) {
   return "secondary" as const;
 }
 
-export function EngineersTable({ items }: { items: EngineerRow[] }) {
+export function EngineersTable({
+  items,
+  canWrite = true,
+}: {
+  items: EngineerRow[];
+  canWrite?: boolean;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<EngineerRow | null>(null);
@@ -88,17 +94,19 @@ export function EngineersTable({ items }: { items: EngineerRow[] }) {
 
   return (
     <>
-      <div className="mb-2 flex justify-end">
-        <Button
-          onClick={() => {
-            setEditing(null);
-            setOpen(true);
-          }}
-        >
-          <Plus className="h-4 w-4" />
-          Tambah Engineer
-        </Button>
-      </div>
+      {canWrite && (
+        <div className="mb-2 flex justify-end">
+          <Button
+            onClick={() => {
+              setEditing(null);
+              setOpen(true);
+            }}
+          >
+            <Plus className="h-4 w-4" />
+            Tambah Engineer
+          </Button>
+        </div>
+      )}
 
       <div className="rounded-lg border bg-card">
         <Table>
@@ -171,23 +179,27 @@ export function EngineersTable({ items }: { items: EngineerRow[] }) {
                           <Eye className="h-4 w-4" />
                         </Link>
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setEditing(e);
-                          setOpen(true);
-                        }}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(e.id, e.full_name)}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      {canWrite && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setEditing(e);
+                              setOpen(true);
+                            }}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDelete(e.id, e.full_name)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -198,36 +210,38 @@ export function EngineersTable({ items }: { items: EngineerRow[] }) {
         </Table>
       </div>
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>
-              {editing ? "Edit Engineer" : "Tambah Engineer"}
-            </DialogTitle>
-          </DialogHeader>
-          <EngineerForm
-            key={editing?.id ?? "new"}
-            initial={
-              editing
-                ? {
-                    id: editing.id,
-                    full_name: editing.full_name,
-                    phone: editing.phone,
-                    city: editing.city,
-                    district: editing.district,
-                    lat: editing.lat ?? -6.2088,
-                    lng: editing.lng ?? 106.8456,
-                    skills: editing.skills,
-                    status: editing.status,
-                    telegram_chat_id: editing.telegram_chat_id ?? "",
-                    birth_date: toDateInputValue(editing.birth_date),
-                  }
-                : undefined
-            }
-            onSuccess={handleSuccess}
-          />
-        </DialogContent>
-      </Dialog>
+      {canWrite && (
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>
+                {editing ? "Edit Engineer" : "Tambah Engineer"}
+              </DialogTitle>
+            </DialogHeader>
+            <EngineerForm
+              key={editing?.id ?? "new"}
+              initial={
+                editing
+                  ? {
+                      id: editing.id,
+                      full_name: editing.full_name,
+                      phone: editing.phone,
+                      city: editing.city,
+                      district: editing.district,
+                      lat: editing.lat ?? -6.2088,
+                      lng: editing.lng ?? 106.8456,
+                      skills: editing.skills,
+                      status: editing.status,
+                      telegram_chat_id: editing.telegram_chat_id ?? "",
+                      birth_date: toDateInputValue(editing.birth_date),
+                    }
+                  : undefined
+              }
+              onSuccess={handleSuccess}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   );
 }

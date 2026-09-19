@@ -30,6 +30,42 @@ function isAdminRole(role: string | undefined): boolean {
   return !!role && (ADMIN_ROLES as readonly string[]).includes(role);
 }
 
+function rolesAllowedForAdminPath(pathname: string): readonly string[] {
+  // Inline mirror of lib/rbac ADMIN_PATH_ROLE_RULES — Edge bundle tidak import Prisma/rbac server
+  const USERS = ["SUPER_ADMIN"] as const;
+  const MASTER = ["SUPER_ADMIN", "ADMIN_NOC"] as const;
+  const SYSTEM = ["SUPER_ADMIN", "ADMIN_NOC"] as const;
+  const ENGINEERS = [
+    "SUPER_ADMIN",
+    "ADMIN_NOC",
+    "DISPATCHER",
+    "NOC_L1",
+  ] as const;
+  const LEGAL = ["SUPER_ADMIN", "ADMIN_NOC", "DISPATCHER"] as const;
+
+  const rules: { prefix: string; roles: readonly string[] }[] = [
+    { prefix: "/admin/users", roles: USERS },
+    { prefix: "/admin/tenants", roles: MASTER },
+    { prefix: "/admin/devices", roles: MASTER },
+    { prefix: "/admin/service-categories", roles: MASTER },
+    { prefix: "/admin/spareparts", roles: MASTER },
+    { prefix: "/admin/hr", roles: MASTER },
+    { prefix: "/admin/payroll", roles: MASTER },
+    { prefix: "/admin/integrations", roles: SYSTEM },
+    { prefix: "/admin/settings", roles: SYSTEM },
+    { prefix: "/admin/legal", roles: LEGAL },
+    { prefix: "/admin/recruitment", roles: LEGAL },
+    { prefix: "/admin/engineers", roles: ENGINEERS },
+  ];
+
+  for (const rule of rules) {
+    if (pathname === rule.prefix || pathname.startsWith(rule.prefix + "/")) {
+      return rule.roles;
+    }
+  }
+  return ADMIN_ROLES;
+}
+
 /** Prefix API publik / non-session (punya auth sendiri) */
 function isPublicApiPath(pathname: string): boolean {
   return (
@@ -128,6 +164,10 @@ export const authConfig = {
             new URL("/engineer/my-tickets", request.url)
           );
         }
+        const allowed = rolesAllowedForAdminPath(pathname);
+        if (!role || !(allowed as readonly string[]).includes(role)) {
+          return Response.redirect(new URL("/admin/dashboard", request.url));
+        }
         return true;
       }
 
@@ -145,6 +185,10 @@ export const authConfig = {
       if (pathname.startsWith("/coordinator")) {
         if (!isLoggedIn) {
           return Response.redirect(new URL("/login", request.url));
+        }
+        // Hanya FE koordinator (flag dicek di layout/page via DB)
+        if (role !== "FIELD_ENGINEER") {
+          return Response.redirect(new URL("/admin/dashboard", request.url));
         }
         return true;
       }

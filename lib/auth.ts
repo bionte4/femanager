@@ -40,6 +40,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           return null;
         }
 
+        if (user.is_suspended) {
+          return null;
+        }
+
         const valid = await bcrypt.compare(password, user.password);
         if (!valid) {
           return null;

@@ -9,19 +9,15 @@ import {
 } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { auth, ADMIN_ROLES } from "@/lib/auth";
 import { formatRupiah } from "@/lib/utils/rupiah";
 import { sendWhatsApp } from "@/lib/whatsapp";
 import { calculateMttrMinutes, calculateSlaMeetPercent } from "@/lib/sla";
 import { BANKS } from "@/lib/wallet-constants";
 import { isMitraEngagement, isPkwtEngagement } from "@/lib/eligibility";
+import { PAYROLL_ROLES, requireRoles } from "@/lib/rbac";
 
 async function requireAdmin() {
-  const session = await auth();
-  if (!session?.user || !(ADMIN_ROLES as readonly string[]).includes(session.user.role)) {
-    throw new Error("Unauthorized");
-  }
-  return session;
+  return requireRoles(PAYROLL_ROLES);
 }
 
 export type ActionResult<T = undefined> =

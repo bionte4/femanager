@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { auth, ADMIN_ROLES } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import {
@@ -13,13 +12,10 @@ import {
   categoryExcelRowSchema,
   type CategoryPreviewRow,
 } from "@/lib/validations/category-excel";
+import { requireMasterAdmin } from "@/lib/rbac";
 
 async function requireAdmin() {
-  const session = await auth();
-  if (!session?.user || !(ADMIN_ROLES as readonly string[]).includes(session.user.role)) {
-    throw new Error("Unauthorized");
-  }
-  return session;
+  return requireMasterAdmin();
 }
 
 export async function listServiceCategories(activeOnly = false) {

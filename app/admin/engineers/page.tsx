@@ -6,6 +6,8 @@ import {
   SearchFilterBar,
 } from "@/components/admin/search-filter-bar";
 import { TableSkeleton } from "@/components/ui/skeleton";
+import { auth } from "@/lib/auth";
+import { ENGINEERS_WRITE_ROLES, hasRole } from "@/lib/rbac-constants";
 
 type PageProps = {
   searchParams:
@@ -14,6 +16,8 @@ type PageProps = {
 };
 
 export default async function EngineersPage({ searchParams }: PageProps) {
+  const session = await auth();
+  const canWrite = hasRole(session?.user?.role, ENGINEERS_WRITE_ROLES);
   const params = await Promise.resolve(searchParams);
   const page = Number(params.page ?? "1") || 1;
   const data = await getEngineers({
@@ -31,6 +35,7 @@ export default async function EngineersPage({ searchParams }: PageProps) {
         <p className="text-xs text-muted-foreground">
           Field engineer Mitra (komisi) dan PKWT (payroll) — filter tipe
           engagement di bawah.
+          {!canWrite && " Mode baca saja."}
         </p>
       </div>
 
@@ -52,7 +57,7 @@ export default async function EngineersPage({ searchParams }: PageProps) {
         />
       </Suspense>
 
-      <EngineersTable items={data.items} />
+      <EngineersTable items={data.items} canWrite={canWrite} />
 
       <Suspense fallback={null}>
         <Pagination

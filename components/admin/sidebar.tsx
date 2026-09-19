@@ -27,6 +27,7 @@ import {
   Menu,
   X,
   FileText,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 import { useState } from "react";
@@ -50,6 +51,15 @@ type NavGroup = {
 };
 
 const CONTRACT_ROLES = ["SUPER_ADMIN", "ADMIN_NOC"] as const;
+const MASTER_ROLES = ["SUPER_ADMIN", "ADMIN_NOC"] as const;
+const ENGINEERS_ROLES = [
+  "SUPER_ADMIN",
+  "ADMIN_NOC",
+  "DISPATCHER",
+  "NOC_L1",
+] as const;
+const LEGAL_ROLES = ["SUPER_ADMIN", "ADMIN_NOC", "DISPATCHER"] as const;
+const SUPER_ONLY = ["SUPER_ADMIN"] as const;
 
 const NAV_GROUPS: NavGroup[] = [
   {
@@ -66,41 +76,102 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Master",
     items: [
-      { href: "/admin/tenants", label: "Tenants", icon: Store },
-      { href: "/admin/devices", label: "Devices", icon: Cpu },
-      { href: "/admin/service-categories", label: "Kategori", icon: Layers },
-      { href: "/admin/spareparts", label: "Spareparts", icon: Package },
+      {
+        href: "/admin/tenants",
+        label: "Tenants",
+        icon: Store,
+        roles: MASTER_ROLES,
+      },
+      {
+        href: "/admin/devices",
+        label: "Devices",
+        icon: Cpu,
+        roles: MASTER_ROLES,
+      },
+      {
+        href: "/admin/service-categories",
+        label: "Kategori",
+        icon: Layers,
+        roles: MASTER_ROLES,
+      },
+      {
+        href: "/admin/spareparts",
+        label: "Spareparts",
+        icon: Package,
+        roles: MASTER_ROLES,
+      },
       { href: "/admin/kb", label: "Knowledge Base", icon: BookOpen },
     ],
   },
   {
     label: "Mitra",
     items: [
-      { href: "/admin/engineers", label: "Engineers", icon: HardHat },
+      {
+        href: "/admin/engineers",
+        label: "Engineers",
+        icon: HardHat,
+        roles: ENGINEERS_ROLES,
+      },
       {
         href: "/admin/hr/contracts",
         label: "Kontrak PKWT",
         icon: FileText,
         roles: CONTRACT_ROLES,
       },
-      { href: "/admin/recruitment", label: "Recruitment", icon: UserPlus },
+      {
+        href: "/admin/recruitment",
+        label: "Recruitment",
+        icon: UserPlus,
+        roles: LEGAL_ROLES,
+      },
       { href: "/admin/leaderboard", label: "Leaderboard", icon: Trophy },
-      { href: "/admin/legal", label: "Legal", icon: Scale },
+      {
+        href: "/admin/legal",
+        label: "Legal",
+        icon: Scale,
+        roles: LEGAL_ROLES,
+      },
     ],
   },
   {
     label: "Keuangan",
     items: [
-      { href: "/admin/payroll", label: "Payroll", icon: Wallet },
+      {
+        href: "/admin/payroll",
+        label: "Payroll",
+        icon: Wallet,
+        roles: MASTER_ROLES,
+      },
       { href: "/admin/reports", label: "Reports", icon: BarChart3 },
     ],
   },
   {
     label: "Sistem",
     items: [
-      { href: "/admin/integrations", label: "Integrations", icon: Plug },
-      { href: "/admin/integrations/dlq", label: "Webhook DLQ", icon: Inbox },
-      { href: "/admin/settings", label: "Settings", icon: Settings },
+      {
+        href: "/admin/users",
+        label: "Users",
+        icon: Users,
+        roles: SUPER_ONLY,
+      },
+      {
+        href: "/admin/integrations",
+        label: "Integrations",
+        icon: Plug,
+        roles: MASTER_ROLES,
+      },
+      {
+        href: "/admin/integrations/dlq",
+        label: "Webhook DLQ",
+        icon: Inbox,
+        roles: MASTER_ROLES,
+      },
+      {
+        href: "/admin/settings",
+        label: "Settings",
+        icon: Settings,
+        roles: MASTER_ROLES,
+      },
     ],
   },
 ];

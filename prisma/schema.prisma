@@ -242,6 +242,7 @@ model User {
   engineer_contracts  EngineerContract[]
   engagement_changes  EngagementChangeLog[]
   birthday_greetings  BirthdayGreetingLog[]
+  admin_audits_acted  AdminAuditLog[] @relation("AdminAuditActor")
 
   @@map("users")
 }
@@ -932,4 +933,20 @@ model BirthdayGreetingLog {
   @@unique([user_id, year])
   @@index([year, sent_at])
   @@map("birthday_greeting_logs")
+}
+
+/// Audit aksi admin sensitif (user/role/integrasi)
+model AdminAuditLog {
+  id             String   @id @default(cuid())
+  actor_id       String
+  action         String
+  target_user_id String?
+  metadata       Json?
+  created_at     DateTime @default(now())
+
+  actor User @relation("AdminAuditActor", fields: [actor_id], references: [id], onDelete: Cascade)
+
+  @@index([actor_id, created_at])
+  @@index([action, created_at])
+  @@map("admin_audit_logs")
 }

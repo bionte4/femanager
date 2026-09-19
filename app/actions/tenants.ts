@@ -14,6 +14,7 @@ import {
   tenantExcelRowSchema,
   type TenantPreviewRow,
 } from "@/lib/validations/tenant-excel";
+import { requireMasterAdmin } from "@/lib/rbac";
 
 async function requireAdmin() {
   const session = await auth();
@@ -33,7 +34,7 @@ export async function getTenants(params: {
   page?: number;
   pageSize?: number;
 }) {
-  await requireAdmin();
+  await requireMasterAdmin();
   const page = Math.max(1, params.page ?? 1);
   const pageSize = Math.min(50, Math.max(5, params.pageSize ?? 10));
   const q = params.q?.trim();
@@ -82,7 +83,7 @@ export async function getTenants(params: {
 
 export async function createTenant(input: TenantInput): Promise<ActionResult<{ id: string }>> {
   try {
-    await requireAdmin();
+    await requireMasterAdmin();
     const data = tenantSchema.parse(input);
 
     const existing = await prisma.tenant.findUnique({ where: { code: data.code } });
@@ -111,7 +112,7 @@ export async function updateTenant(
   input: TenantInput
 ): Promise<ActionResult> {
   try {
-    await requireAdmin();
+    await requireMasterAdmin();
     const data = tenantSchema.parse(input);
 
     const conflict = await prisma.tenant.findFirst({
@@ -140,7 +141,7 @@ export async function updateTenant(
 
 export async function deleteTenant(id: string): Promise<ActionResult> {
   try {
-    await requireAdmin();
+    await requireMasterAdmin();
     await prisma.tenant.delete({ where: { id } });
     revalidatePath("/admin/tenants");
     revalidatePath("/admin/devices");
@@ -160,7 +161,7 @@ export async function getTenantOptions() {
 }
 
 export async function getTenantsForExport() {
-  await requireAdmin();
+  await requireMasterAdmin();
   const rows = await prisma.tenant.findMany({
     orderBy: { code: "asc" },
     take: 5000,
@@ -188,7 +189,7 @@ export async function previewTenantsImport(
   ActionResult<{ rows: TenantPreviewRow[]; okCount: number; errorCount: number }>
 > {
   try {
-    await requireAdmin();
+    await requireMasterAdmin();
     if (!Array.isArray(rawRows) || rawRows.length === 0) {
       return { success: false, error: "File kosong / tidak ada baris data" };
     }
@@ -281,7 +282,7 @@ export async function commitTenantsImport(
   previewRows: TenantPreviewRow[]
 ): Promise<ActionResult<{ created: number; updated: number }>> {
   try {
-    await requireAdmin();
+    await requireMasterAdmin();
     const valid = previewRows.filter(
       (r) => (r.action === "create" || r.action === "update") && r.payload
     );

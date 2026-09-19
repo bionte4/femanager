@@ -3,20 +3,16 @@
 import { revalidatePath } from "next/cache";
 import { LocationType, Prisma, Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { auth, ADMIN_ROLES } from "@/lib/auth";
 import { sparepartSchema, type SparepartInput } from "@/lib/validations/spareparts";
 import {
   normalizeExcelHeaders,
   sparepartExcelRowSchema,
   type SparepartPreviewRow,
 } from "@/lib/validations/sparepart-excel";
+import { requireMasterAdmin } from "@/lib/rbac";
 
 async function requireAdmin() {
-  const session = await auth();
-  if (!session?.user || !(ADMIN_ROLES as readonly string[]).includes(session.user.role)) {
-    throw new Error("Unauthorized");
-  }
-  return session;
+  return requireMasterAdmin();
 }
 
 export type ActionResult<T = undefined> =

@@ -4,8 +4,12 @@ import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { Prisma, Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { auth, ADMIN_ROLES } from "@/lib/auth";
 import { engineerSchema, type EngineerInput } from "@/lib/validations/master";
+import {
+  ENGINEERS_READ_ROLES,
+  ENGINEERS_WRITE_ROLES,
+  requireRoles,
+} from "@/lib/rbac";
 
 /** Parse YYYY-MM-DD → Date noon UTC (hindari geser hari karena TZ). */
 function parseBirthDate(ymd: string | null | undefined): Date | null {
@@ -14,12 +18,12 @@ function parseBirthDate(ymd: string | null | undefined): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-async function requireAdmin() {
-  const session = await auth();
-  if (!session?.user || !(ADMIN_ROLES as readonly string[]).includes(session.user.role)) {
-    throw new Error("Unauthorized");
-  }
-  return session;
+async function requireEngineerRead() {
+  return requireRoles(ENGINEERS_READ_ROLES);
+}
+
+async function requireEngineerWrite() {
+  return requireRoles(ENGINEERS_WRITE_ROLES);
 }
 
 type ActionResult<T = undefined> =
@@ -33,7 +37,7 @@ export async function getEngineers(params: {
   page?: number;
   pageSize?: number;
 }) {
-  await requireAdmin();
+  await requireEngineerRead();
   const page = Math.max(1, params.page ?? 1);
   const pageSize = Math.min(50, Math.max(5, params.pageSize ?? 10));
   const q = params.q?.trim();
@@ -109,7 +113,7 @@ export async function createEngineer(
   input: EngineerInput
 ): Promise<ActionResult<{ id: string }>> {
   try {
-    await requireAdmin();
+    await requireEngineerWrite();
     const data = engineerSchema.parse(input);
 
     if (!data.password) {
@@ -151,7 +155,7 @@ export async function updateEngineer(
   input: EngineerInput
 ): Promise<ActionResult> {
   try {
-    await requireAdmin();
+    await requireEngineerWrite();
     const data = engineerSchema.parse(input);
 
     const conflict = await prisma.user.findFirst({
@@ -188,7 +192,7 @@ export async function updateEngineer(
 
 export async function deleteEngineer(id: string): Promise<ActionResult> {
   try {
-    await requireAdmin();
+    await requireEngineerWrite();
     await prisma.user.delete({ where: { id } });
     revalidatePath("/admin/engineers");
     return { success: true };
