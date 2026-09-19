@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { CandidateStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { sendWhatsApp } from "@/lib/whatsapp";
+import { getAdminWhatsAppPhone, sendWhatsApp } from "@/lib/whatsapp";
 import { assertCronAuth } from "@/lib/cron-auth";
 
 /**
@@ -24,7 +24,7 @@ export async function GET(req: Request) {
     orderBy: { created_at: "asc" },
   });
 
-  const adminPhone = process.env.ADMIN_WHATSAPP || process.env.ADMIN_PHONE;
+  const adminPhone = await getAdminWhatsAppPhone();
   if (adminPhone && stale.length > 0) {
     const names = stale
       .slice(0, 10)

@@ -103,7 +103,8 @@ export async function POST(req: NextRequest) {
     });
 
     // Notif admin
-    const adminPhone = process.env.ADMIN_WHATSAPP || process.env.ADMIN_PHONE;
+    const { getAdminWhatsAppPhone } = await import("@/lib/whatsapp");
+    const adminPhone = await getAdminWhatsAppPhone();
     if (adminPhone) {
       void sendWhatsApp({
         phone: adminPhone,

@@ -173,7 +173,8 @@ export async function remindExpiringContracts(
   }
 
   let remindedAdmin = false;
-  const adminPhone = process.env.ADMIN_WHATSAPP || process.env.ADMIN_PHONE;
+  const { getAdminWhatsAppPhone } = await import("@/lib/whatsapp");
+  const adminPhone = await getAdminWhatsAppPhone();
   if (adminPhone && matched.length > 0) {
     const lines = matched
       .slice(0, 15)

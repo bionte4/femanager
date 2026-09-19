@@ -146,6 +146,7 @@ Outbound status → customer webhook; gagal setelah retry → **Webhook DLQ** (`
 | Auto-dispatch + skill/cert match | `lib/dispatch.ts`, `lib/skill-match.ts` |
 | Mitra vs PKWT eligibility | `lib/eligibility.ts`, [ENGAGEMENT.md](./ENGAGEMENT.md) |
 | Kontrak PKWT + placement | `lib/contracts.ts`, `app/actions/contracts.ts`, `/admin/hr/contracts` |
+| Integrasi WA / SMTP / AI | `/admin/settings/integrations`, `lib/app-settings.ts` |
 | Duplicate ticket merge | `lib/tickets/dedupe.ts` |
 | Handover L0→L1 | `l1_handover` JSON + `components/ticket/handover-form.tsx` |
 | Stop clock SLA | `lib/stop-clock.ts`, aksi di detail ticket |

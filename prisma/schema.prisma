@@ -888,3 +888,13 @@ model EngagementChangeLog {
   @@index([user_id, created_at])
   @@map("engagement_change_logs")
 }
+
+/// Key-value settings (WA / SMTP / AI) — override env dari admin UI
+model AppSetting {
+  key        String   @id
+  value      Json
+  updated_at DateTime @updatedAt
+  updated_by String?
+
+  @@map("app_settings")
+}

@@ -15,9 +15,14 @@ export default async function SettingsPage() {
             Atur response time & resolution time per SLA tier (menit).
           </p>
         </div>
-        <Button asChild variant="outline">
-          <Link href="/admin/settings/commissions">Commission Rules →</Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline">
+            <Link href="/admin/settings/integrations">WA / Email / AI →</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href="/admin/settings/commissions">Commission Rules →</Link>
+          </Button>
+        </div>
       </div>
 
       <SlaConfigPanel items={configs} />

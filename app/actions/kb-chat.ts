@@ -15,12 +15,15 @@ export type KbChatResult = {
   lowConfidence: boolean;
   hits: KbSearchHit[];
   categoryUsed: string | null;
+  /** true jika jawaban dipoles oleh LLM */
+  ai_enhanced?: boolean;
 };
 
 export type KbChatError = { success: false; error: string };
 
 /**
- * Tanya SOP ke Knowledge Base (search lokal, tanpa LLM).
+ * Tanya SOP ke Knowledge Base.
+ * Default: search lokal. Jika AI enabled di Settings → ringkas jawaban dari hit KB.
  */
 export async function askKnowledgeBaseAction(input: {
   question: string;
@@ -54,13 +57,45 @@ export async function askKnowledgeBaseAction(input: {
       hrefBase: "/engineer/kb",
     });
 
-    // Admin tidak pakai route engineer — citation tetap id; UI admin buka dialog list
     const normalizedHits: KbSearchHit[] =
       audience === "admin"
         ? hits.map((h) => ({ ...h, href: `/admin/kb?highlight=${h.id}` }))
         : hits;
 
-    const { answer, lowConfidence } = buildKbReply(normalizedHits, question);
+    let { answer, lowConfidence } = buildKbReply(normalizedHits, question);
+    let aiEnhanced = false;
+
+    const { getAiSettings } = await import("@/lib/app-settings");
+    const aiCfg = await getAiSettings();
+    if (aiCfg.enabled && aiCfg.api_key && normalizedHits.length > 0) {
+      const context = normalizedHits
+        .map(
+          (h, i) =>
+            `[${i + 1}] ${h.title} (${h.category})\n${h.excerpt}`
+        )
+        .join("\n\n");
+      const { chatCompletion } = await import("@/lib/ai");
+      const ai = await chatCompletion({
+        messages: [
+          {
+            role: "system",
+            content:
+              "Anda asisten SOP FE-Track. Jawab singkat dalam Bahasa Indonesia hanya berdasarkan konteks KB. Jika tidak cukup, bilang data KB kurang. Jangan mengarang prosedur berbahaya.",
+          },
+          {
+            role: "user",
+            content: `Pertanyaan: ${question}\n\nKonteks KB:\n${context}`,
+          },
+        ],
+        temperature: 0.2,
+        max_tokens: 500,
+      });
+      if (ai.ok) {
+        answer = ai.content;
+        lowConfidence = false;
+        aiEnhanced = true;
+      }
+    }
 
     return {
       success: true,
@@ -68,6 +103,7 @@ export async function askKnowledgeBaseAction(input: {
       lowConfidence,
       hits: normalizedHits,
       categoryUsed: input.category?.trim() || null,
+      ai_enhanced: aiEnhanced,
     };
   } catch (e) {
     return {

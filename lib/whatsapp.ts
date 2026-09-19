@@ -20,14 +20,23 @@ export function normalizePhoneId(phone: string): string {
 
 /**
  * Kirim WA via Fonnte API
+ * Token: AppSetting integrations.whatsapp → fallback FONNTE_TOKEN
  * Docs: https://fonnte.com — POST https://api.fonnte.com/send
  */
 export async function sendWhatsApp(
   params: SendWhatsAppParams
 ): Promise<SendWhatsAppResult> {
-  const token = process.env.FONNTE_TOKEN;
+  const { getWhatsappSettings } = await import("@/lib/app-settings");
+  const cfg = await getWhatsappSettings();
+
+  if (!cfg.enabled) {
+    console.warn("[whatsapp] disabled di Settings — skip");
+    return { success: true, skipped: true };
+  }
+
+  const token = cfg.token.trim();
   if (!token) {
-    console.warn("[whatsapp] FONNTE_TOKEN kosong — skip kirim WA");
+    console.warn("[whatsapp] token kosong (Settings/FONNTE_TOKEN) — skip");
     return { success: true, skipped: true };
   }
 
@@ -58,6 +67,14 @@ export async function sendWhatsApp(
     console.error("[whatsapp]", error);
     return { success: false, error };
   }
+}
+
+/** Nomor admin untuk reminder (Settings → fallback env) */
+export async function getAdminWhatsAppPhone(): Promise<string | null> {
+  const { getWhatsappSettings } = await import("@/lib/app-settings");
+  const cfg = await getWhatsappSettings();
+  const phone = cfg.admin_phone.trim();
+  return phone || null;
 }
 
 export function buildDispatchMessage(ticketNo: string, tenantName: string): string {
