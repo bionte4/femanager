@@ -6,7 +6,7 @@ import { LoginForm } from "@/components/auth/login-form";
 export const metadata = {
   title: "Login | FE-Track",
   description:
-    "Platform penugasan field engineer untuk pemenuhan SLA se-Indonesia",
+    "Kelola field engineer secara terpusat. SLA terukur, operasional terkendali.",
 };
 
 export default async function LoginPage() {
