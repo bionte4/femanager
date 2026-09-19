@@ -292,6 +292,7 @@ export async function approveCandidateAction(
           has_toolkit: candidate.has_toolkit,
           has_car: candidate.has_car,
           partnership_status: "NOT_SIGNED",
+          email: candidate.email?.trim() || null,
           tools_owned: [
             candidate.has_motorcycle ? "motorcycle" : null,
             candidate.has_toolkit ? "toolkit" : null,

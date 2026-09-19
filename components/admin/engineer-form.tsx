@@ -69,6 +69,7 @@ export function EngineerForm({ initial, onSuccess }: EngineerFormProps) {
       skills: initial?.skills ?? ["EDC"],
       status: initial?.status ?? "AVAILABLE",
       telegram_chat_id: initial?.telegram_chat_id ?? "",
+      email: initial?.email ?? "",
       birth_date: initial?.birth_date ?? "",
     },
   });
@@ -205,6 +206,18 @@ export function EngineerForm({ initial, onSuccess }: EngineerFormProps) {
           </p>
           {errors.birth_date && (
             <p className="text-xs text-destructive">{errors.birth_date.message}</p>
+          )}
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="email">Email (opsional)</Label>
+          <Input
+            id="email"
+            type="email"
+            placeholder="nama@email.com — untuk OTP reset password"
+            {...register("email")}
+          />
+          {errors.email && (
+            <p className="text-xs text-destructive">{errors.email.message}</p>
           )}
         </div>
         <div className="space-y-1.5">

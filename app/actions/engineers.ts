@@ -89,6 +89,7 @@ export async function getEngineers(params: {
         employment_status: true,
         partnership_status: true,
         telegram_chat_id: true,
+        email: true,
         birth_date: true,
         created_at: true,
       },
@@ -139,6 +140,7 @@ export async function createEngineer(
         skills: data.skills,
         status: data.status,
         telegram_chat_id: data.telegram_chat_id ?? null,
+        email: data.email ?? null,
         birth_date: parseBirthDate(data.birth_date),
       },
     });
@@ -175,6 +177,7 @@ export async function updateEngineer(
       skills: data.skills,
       status: data.status,
       telegram_chat_id: data.telegram_chat_id ?? null,
+      email: data.email ?? null,
       birth_date: parseBirthDate(data.birth_date),
     };
 

@@ -18,7 +18,7 @@ type ActionResult =
 
 const phoneSchema = z.object({
   phone: z.string().min(10).max(20),
-  channel: z.enum(["whatsapp", "telegram"]).default("whatsapp"),
+  channel: z.enum(["whatsapp", "telegram", "email"]).default("whatsapp"),
 });
 
 const resetSchema = z.object({

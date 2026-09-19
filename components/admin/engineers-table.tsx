@@ -41,6 +41,7 @@ type EngineerRow = {
   employment_status?: string;
   partnership_status?: string;
   telegram_chat_id?: string | null;
+  email?: string | null;
   /** ISO date atau YYYY-MM-DD dari server */
   birth_date?: string | Date | null;
 };
@@ -233,6 +234,7 @@ export function EngineersTable({
                       skills: editing.skills,
                       status: editing.status,
                       telegram_chat_id: editing.telegram_chat_id ?? "",
+                      email: editing.email ?? "",
                       birth_date: toDateInputValue(editing.birth_date),
                     }
                   : undefined

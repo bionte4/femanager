@@ -89,6 +89,18 @@ export const engineerSchema = z.object({
       const t = (v ?? "").trim();
       return t || null;
     }),
+  email: z
+    .string()
+    .max(200)
+    .optional()
+    .nullable()
+    .transform((v) => {
+      const t = (v ?? "").trim();
+      return t || null;
+    })
+    .refine((v) => v === null || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), {
+      message: "Format email tidak valid",
+    }),
   /// YYYY-MM-DD dari <input type="date">; kosong = null
   birth_date: z
     .string()

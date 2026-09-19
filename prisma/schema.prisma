@@ -219,6 +219,8 @@ model User {
   can_work_for_others Boolean  @default(true)
   /// Chat ID Telegram untuk notifikasi / OTP (opsional, gratis)
   telegram_chat_id String?
+  /// Email untuk OTP reset password / notifikasi (opsional)
+  email         String?
   /// Tanggal lahir — untuk cron ucapan ulang tahun WA/Telegram
   birth_date    DateTime?      @db.Date
   created_at    DateTime       @default(now())

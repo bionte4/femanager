@@ -24,8 +24,15 @@ export async function findUserByPhoneFlexible(phone: string) {
       full_name: true,
       is_suspended: true,
       telegram_chat_id: true,
+      email: true,
     },
   });
+}
+
+function channelLabel(channel: OtpChannel): string {
+  if (channel === "telegram") return "Telegram";
+  if (channel === "email") return "Email";
+  return "WhatsApp";
 }
 
 function hashOtp(code: string, phone62: string): string {
@@ -45,7 +52,7 @@ function safeEqualHex(a: string, b: string): boolean {
   }
 }
 
-export type OtpChannel = "whatsapp" | "telegram";
+export type OtpChannel = "whatsapp" | "telegram" | "email";
 
 export type RequestOtpResult =
   | { ok: true; message: string; debug_code?: string; channel: OtpChannel }
@@ -60,9 +67,9 @@ export async function requestPasswordResetOtp(
     return { ok: false, error: "Nomor HP tidak valid" };
   }
 
-  const channelLabel = channel === "telegram" ? "Telegram" : "WhatsApp";
+  const label = channelLabel(channel);
   // Jangan bocorkan apakah nomor terdaftar
-  const genericOk = `Jika nomor terdaftar, kode OTP dikirim via ${channelLabel} (berlaku 10 menit).`;
+  const genericOk = `Jika nomor terdaftar, kode OTP dikirim via ${label} (berlaku 10 menit).`;
 
   const user = await findUserByPhoneFlexible(phoneRaw);
   if (!user || user.is_suspended) {
@@ -73,7 +80,14 @@ export async function requestPasswordResetOtp(
     return {
       ok: false,
       error:
-        "Akun ini belum punya Telegram Chat ID. Pilih WhatsApp, atau minta admin mengisi Chat ID di profil.",
+        "Akun ini belum punya Telegram Chat ID. Pilih WhatsApp/Email, atau minta admin mengisi Chat ID di profil.",
+    };
+  }
+  if (channel === "email" && !user.email?.trim()) {
+    return {
+      ok: false,
+      error:
+        "Akun ini belum punya email. Pilih WhatsApp/Telegram, atau minta admin mengisi email di profil.",
     };
   }
 
@@ -118,7 +132,36 @@ export async function requestPasswordResetOtp(
     if (!tg.success) {
       return {
         ok: false,
-        error: tg.error || "Gagal kirim OTP Telegram. Coba WhatsApp atau hubungi admin.",
+        error:
+          tg.error ||
+          "Gagal kirim OTP Telegram. Coba WhatsApp/Email atau hubungi admin.",
+      };
+    }
+  } else if (channel === "email") {
+    const { sendEmail } = await import("@/lib/email");
+    const mail = await sendEmail({
+      to: user.email!.trim(),
+      subject: "FE-Track — Kode OTP reset password",
+      text: otpMsg,
+      html: `<p>Halo${user.full_name ? ` <b>${user.full_name}</b>` : ""},</p>
+<p>Kode OTP reset password Anda:</p>
+<p style="font-size:28px;letter-spacing:6px;font-weight:700">${code}</p>
+<p>Berlaku 10 menit. Jangan bagikan ke siapa pun.</p>
+<p style="color:#666;font-size:12px">FE-Track</p>`,
+    });
+    if (mail.skipped) {
+      return {
+        ok: false,
+        error:
+          "Email/SMTP belum aktif. Aktifkan SMTP di Settings → Integrations, atau pilih WhatsApp/Telegram.",
+      };
+    }
+    if (!mail.success) {
+      return {
+        ok: false,
+        error:
+          mail.error ||
+          "Gagal kirim OTP email. Coba WhatsApp/Telegram atau hubungi admin.",
       };
     }
   } else {
@@ -130,13 +173,15 @@ export async function requestPasswordResetOtp(
       return {
         ok: false,
         error:
-          "WhatsApp belum siap. Set gateway di Settings → Integrations, atau pilih Telegram.",
+          "WhatsApp belum siap. Set gateway di Settings → Integrations, atau pilih Telegram/Email.",
       };
     }
     if (!wa.success) {
       return {
         ok: false,
-        error: wa.error || "Gagal kirim OTP WhatsApp. Coba Telegram atau hubungi admin.",
+        error:
+          wa.error ||
+          "Gagal kirim OTP WhatsApp. Coba Telegram/Email atau hubungi admin.",
       };
     }
   }
